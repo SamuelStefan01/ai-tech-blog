@@ -20,6 +20,9 @@
 !img/
 !img/**
 
+!data/
+!data/**
+
 # Ignore IDE junk
 .idea/
 .vscode/

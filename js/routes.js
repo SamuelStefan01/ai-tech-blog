@@ -5,7 +5,7 @@ const articleFormsHandler = new ArticleFormsHandler(BASE_URL);
 
 // ===== Resilient fetch helpers (timeout + retry + cache) =====
 const ARTICLES_CACHE_KEY = "articles_cache_v1";
-const API_TIMEOUT_MS = 8000;
+const API_TIMEOUT_MS = 15000; // 15s client timeout
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -51,6 +51,19 @@ function setArticlesState(target, state, extra = {}) {
   }
 }
 
+
+// Local fallback (keeps the site usable when WT API is down)
+const FALLBACK_JSON_URL = "./data/articles_fallback.json";
+
+async function loadFallbackResponseText(pageSize, offset) {
+  const res = await fetch(FALLBACK_JSON_URL, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Fallback HTTP ${res.status}`);
+  const all = await res.json();
+  const total = Array.isArray(all.articles) ? all.articles.length : 0;
+  const slice = (all.articles || []).slice(offset, offset + pageSize);
+  const shaped = { articles: slice, meta: { totalCount: total } };
+  return JSON.stringify(shaped);
+}
 
 // ===== Routes config for SPA =====
 
@@ -161,6 +174,7 @@ function createHtml4opinions(targetElm) {
 
 // ===== Articles from WT server (AJAX + pagination) =====
 
+
 function fetchAndDisplayArticles(targetElm, params) {
   const target = document.getElementById(targetElm);
   const listTpl = document.getElementById("template-articles");
@@ -172,12 +186,41 @@ function fetchAndDisplayArticles(targetElm, params) {
   const offset = params && params.offset ? Number(params.offset) || 0 : 0;
   const url = `${BASE_URL}/article?max=${pageSize}&offset=${offset}`;
 
-  const onRetry = () => fetchAndDisplayArticles(targetElm, params);
+  const onRetry = () => {
+    // clear cooldown so retry actually retries
+    localStorage.removeItem(API_COOLDOWN_KEY);
+    fetchAndDisplayArticles(targetElm, params);
+  };
 
   (async () => {
     setArticlesState(target, "loading");
 
-    // try up to 3 times (2 retries) with backoff
+    // If upstream is in cooldown, don't even try the API — use cache/fallback.
+    const cooldownUntil = getCooldownUntil();
+    if (cooldownUntil && Date.now() < cooldownUntil) {
+      // cache per offset first
+      try {
+        const cached = localStorage.getItem(ARTICLES_CACHE_KEY + `:${offset}`);
+        if (cached) {
+          const { text } = JSON.parse(cached);
+          setArticlesState(target, "error_cached");
+          handleArticlesSuccess(text, listTpl, target, offset, pageSize);
+          return;
+        }
+      } catch (_) {}
+
+      // then fallback JSON
+      try {
+        const text = await loadFallbackResponseText(pageSize, offset);
+        setArticlesState(target, "error_cached");
+        handleArticlesSuccess(text, listTpl, target, offset, pageSize);
+        return;
+      } catch (_) {
+        // fall through
+      }
+    }
+
+    // Try API up to 3 times (2 retries) with backoff.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const { res, text } = await fetchTextWithTimeout(url, API_TIMEOUT_MS);
@@ -190,21 +233,24 @@ function fetchAndDisplayArticles(targetElm, params) {
         }
 
         handleArticlesSuccess(text, listTpl, target, offset, pageSize);
+        clearCooldownOnSuccess();
 
         // cache last good response (per offset)
         try {
           localStorage.setItem(ARTICLES_CACHE_KEY + `:${offset}`, JSON.stringify({ ts: Date.now(), text }));
         } catch (_) {}
 
-        // attach retry button if template contains it (no harm if missing)
-        document.getElementById("retry-load-articles")?.addEventListener("click", onRetry);
         return;
       } catch (e) {
-        // dev logging
+        // IMPORTANT: if AbortController cancelled it, it's a timeout on OUR side.
+        // Either way, treat it as failure.
+        setCooldownAfterFailure();
+
         if (location.hostname === "localhost") {
-          console.error("Articles fetch failed:", e.message, e.status, e.body);
+          console.error("Articles fetch failed:", e.name, e.message, e.status, e.body);
         }
-        if (attempt < 2) await sleep(500 * (attempt + 1));
+
+        if (attempt < 2) await sleep(700 * (attempt + 1)); // backoff
       }
     }
 
@@ -219,11 +265,20 @@ function fetchAndDisplayArticles(targetElm, params) {
       }
     } catch (_) {}
 
+    // fallback to local JSON
+    try {
+      const text = await loadFallbackResponseText(pageSize, offset);
+      setArticlesState(target, "error_cached");
+      handleArticlesSuccess(text, listTpl, target, offset, pageSize);
+      return;
+    } catch (_) {}
+
     // render error template and wire retry
     target.innerHTML = Mustache.render(errorTpl.innerHTML, {});
     document.getElementById("retry-load-articles")?.addEventListener("click", onRetry);
   })();
 }
+
 
 // ===== Article detail view (AJAX) =====
 

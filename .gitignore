@@ -1,0 +1,12 @@
+# Ignore everything by default
+*
+
+# But keep these tracked
+!.gitignore
+!README.md
+!ai-tech-blog/
+!ai-tech-blog/**
+
+# Optional: keep IDE config out
+.idea/
+.vscode/

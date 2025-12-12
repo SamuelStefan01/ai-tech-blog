@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>AI & Tech Blog – SPA</title>
+  <meta name="google-signin-client_id"
+        content="327532328134-tmtf1h4pcukg5vugn7f0g2bs41o89o5o.apps.googleusercontent.com">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+
+  <link rel="stylesheet" href="css/screenStyle.css" media="screen" />
+  <link rel="stylesheet" href="css/printStyle.css" media="print" />
+  <link rel="stylesheet" href="css/colorPalettes.css" media="screen" />
+
+  <!-- Mustache template engine -->
+  <script src="https://unpkg.com/mustache@4.2.0/mustache.min.js"></script>
+</head>
+
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <!-- AI & Tech – SVG mascot (robot head) -->
+      <svg id="logo" viewBox="0 0 220 220" role="img" aria-labelledby="aiLogoTitle aiLogoDesc">
+        <title id="aiLogoTitle">AI & Tech – maskot</title>
+        <desc id="aiLogoDesc">Vektorová ilustrácia robotickej hlavy s anténkou</desc>
+        <!-- background circle -->
+        <defs>
+          <radialGradient id="bg" cx="50%" cy="45%" r="70%">
+            <stop offset="0%" stop-color="#e8f0ff" />
+            <stop offset="100%" stop-color="#c7d7ff" />
+          </radialGradient>
+        </defs>
+        <circle cx="110" cy="110" r="108" fill="url(#bg)" />
+
+        <!-- antenna -->
+        <line x1="110" y1="30" x2="110" y2="55" stroke="#4f46e5" stroke-width="6" stroke-linecap="round" />
+        <circle cx="110" cy="22" r="8" fill="#4f46e5" />
+
+        <!-- head -->
+        <rect x="45" y="60" rx="24" ry="24" width="130" height="95" fill="#ffffff" stroke="#111827" stroke-width="4" />
+
+        <!-- display (face) -->
+        <rect x="58" y="76" rx="14" ry="14" width="104" height="62" fill="#0f172a" />
+
+        <!-- eyes -->
+        <circle cx="86" cy="107" r="10" fill="#60a5fa" />
+        <circle cx="134" cy="107" r="10" fill="#60a5fa" />
+        <circle cx="86" cy="107" r="4" fill="#e0f2fe" />
+        <circle cx="134" cy="107" r="4" fill="#e0f2fe" />
+
+        <!-- smile -->
+        <path d="M82 120 Q110 140 138 120" fill="none" stroke="#22c55e" stroke-width="4" stroke-linecap="round" />
+
+        <!-- ears -->
+        <rect x="36" y="90" width="12" height="36" rx="6" fill="#a5b4fc" />
+        <rect x="172" y="90" width="12" height="36" rx="6" fill="#a5b4fc" />
+
+        <!-- text -->
+        <text x="110" y="195" text-anchor="middle" font-size="16" font-family="system-ui, Segoe UI, Roboto, sans-serif"
+          fill="#111827">
+          AI & Tech Blog
+        </text>
+      </svg>
+
+      <h1>AI &amp; Tech Blog</h1>
+    </div>
+
+    <div id="user-auth">
+      <div id="g_id_onload"
+          data-client_id="327532328134-tmtf1h4pcukg5vugn7f0g2bs41o89o5o.apps.googleusercontent.com"
+          data-callback="onGoogleSignIn">
+      </div>
+      <div class="g_id_signin" data-type="standard"></div>
+
+      <span id="user-info"></span>
+      <button id="logout-btn" hidden>Odhlásiť</button>
+    </div>
+
+    <!-- mobile nav toggle button -->
+    <button
+      id="mobile-nav-toggle"
+      class="mobile-nav-toggle"
+      type="button"
+      aria-label="Open navigation"
+      aria-expanded="false"
+    >
+      <span></span>
+      <span></span>
+      <span></span>
+    </button>
+
+    <div class="header-right">
+      <nav class="site-nav" aria-label="Hlavná navigácia">
+        <a href="#welcome" data-route="welcome">Domov</a>
+        <a href="#articles" data-route="articles">Články</a>
+        <a href="#opinions" data-route="opinions">Názory návštevníkov</a>
+        <a href="#addOpinion" data-route="addOpinion">Napíšte názor</a>
+      </nav>
+
+      <div class="palette-switcher">
+        <button id="palette-toggle" class="palette-toggle" type="button">
+          <span class="palette-toggle-label">Switch Design</span>
+          <span id="palette-current-label" class="palette-current-label">Fantasy Sky</span>
+          <span class="palette-toggle-caret">▾</span>
+        </button>
+
+        <div id="palette-menu" class="palette-menu" hidden>
+          <button class="palette-option" type="button" data-palette="fantasySky">
+            Fantasy Sky
+          </button>
+          <button class="palette-option" type="button" data-palette="fantasyForest">
+            Fantasy Forest
+          </button>
+          <button class="palette-option" type="button" data-palette="daynight">
+            Day &amp; Night
+          </button>
+          <button class="palette-option" type="button" data-palette="phoenix">
+            Colorful Phoenix
+          </button>
+          <button class="palette-option" type="button" data-palette="darkSakura">
+            Dark Sakura
+          </button>
+          <button class="palette-option" type="button" data-palette="moonspace">
+            Gray Moonspace
+          </button>
+          <button class="palette-option" type="button" data-palette="redSnow">
+            Red on Snow
+          </button>
+        </div>
+      </div>
+
+      <div class="theme-switch-wrapper">
+        <label class="theme-switch" for="theme-toggle">
+          <input type="checkbox" id="theme-toggle">
+          <span class="slider"></span>
+        </label>
+        <span class="theme-label">Dark Mode</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- router mount point -->
+  <main id="router-view"></main>
+
+  <!-- ========== WELCOME TEMPLATE ========== -->
+  <script type="text/template" id="template-welcome">
+    <section id="intro">
+      <h2>Vitaj na AI &amp; Tech Blogu</h2>
+      <p>
+        Tento blog je o umelej inteligencii, veľkých jazykových modeloch a tom, ako sa dajú rozumne
+        použiť v praxi – od školských projektov až po digitálnu transformáciu firiem.
+      </p>
+    </section>
+
+    <section>
+      <h3>Čo tu nájdeš</h3>
+      <ul>
+        <li>Články o ChatGPT, LLM a generatívnej AI</li>
+        <li>Konkrétne príklady použitia v priemysle a vývoji softvéru</li>
+        <li>Názory návštevníkov a spätnú väzbu na obsah</li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>Prečo je ChatGPT zaujímavý</h3>
+      <p>
+        ChatGPT nie je „mágia“, ale štatistický model, ktorý vie veľmi dobre pracovať s textom.
+        Vie sumarizovať, vysvetľovať, generovať nápady a pomáhať pri programovaní – ak mu dáš
+        jasné zadanie a kontroluješ výsledok.
+      </p>
+      <p>
+        Viac detailov a príklady nájdeš v sekcii <a href="#articles">Články</a>, kde sú načítané
+        texty zo servera WT. 
+      </p>
+    </section>
+
+    <section id="author">
+      <h3>O autorovi</h3>
+      <p>
+        Blog vytvoril študent TUKE, FEI z odboru Inteligentné systémy a siete –
+        <strong>Samuel Štefán</strong>.
+        <br>
+        Kontakt: <a href="mailto:samuel.stefan.2@student.tuke.sk">samuel.stefan.2@student.tuke.sk</a>
+      </p>
+    </section>
+  </script>
+
+  <!-- ========== ARTICLES FROM WT SERVER ========== -->
+  <script type="text/template" id="template-articles">
+    <section id="articles">
+      <h2>Články z WT servera</h2>
+
+      {{#articles.length}}
+      <ul class="articles" aria-label="Zoznam článkov z WT servera">
+        {{#articles}}
+        <li class="article-card">
+          <a class="article-link" href="#article?id={{id}}">
+            <h3>{{title}}</h3>
+            <p class="article-meta">Autor: {{author}}</p>
+            {{#dateCreated}}
+            <p class="article-meta">Vytvorené: {{dateCreated}}</p>
+            {{/dateCreated}}
+            <p class="article-snippet">{{contentShort}}</p>
+          </a>
+        </li>
+        {{/articles}}
+      </ul>
+      {{/articles.length}}
+
+      {{^articles.length}}
+      <p>Žiadne články na zobrazenie.</p>
+      {{/articles.length}}
+
+      {{#paging}}
+      <nav class="paging">
+        <a href="#artInsert" class="btn btn-insert">Pridať článok</a>
+
+        <div class="paging-right">
+          {{#prev}}
+          <a href="#articles?offset={{prevOffset}}" class="btn btn-prev">Previous</a>
+          {{/prev}}
+          {{#next}}
+          <a href="#articles?offset={{nextOffset}}" class="btn btn-next">Next</a>
+          {{/next}}
+        </div>
+      </nav>
+      {{/paging}}
+    </section>
+  </script>
+
+  <script type="text/template" id="template-articles-error">
+    <section id="articles">
+      <h2>Články</h2>
+      <p>Nepodarilo sa načítať články zo servera. Skúste to neskôr znova.</p>
+    </section>
+  </script>
+
+  <!-- ========== ARTICLE DETAIL VIEW ========== -->
+  <script type="text/template" id="template-article-detail">
+    <section id="article-detail">
+      <h2>{{title}}</h2>
+      <p class="article-meta">Autor: {{author}}</p>
+      {{#dateCreated}}
+        <p class="article-meta">Vytvorené: {{dateCreated}}</p>
+      {{/dateCreated}}
+
+      <article class="article-content">
+        {{{content}}}
+      </article>
+
+      <div class="article-detail-actions">
+        <a href="#articles?offset={{backOffset}}" class="btn">Back</a>
+        <a href="#artEdit?id={{id}}&offset={{backOffset}}" class="btn">Edit</a>
+        <a href="#artDelete?id={{id}}&offset={{backOffset}}" class="btn">Delete</a>
+      </div>
+
+      <section id="comments">
+        <h3>Komentáre</h3>
+        {{#comments.length}}
+          <ul>
+            {{#comments}}
+              <li><strong>{{author}}</strong>: {{text}}</li>
+            {{/comments}}
+          </ul>
+        {{/comments.length}}
+        {{^comments.length}}
+          <p>Zatiaľ žiadne komentáre.</p>
+        {{/comments.length}}
+
+        <button class="btn" id="add-comment-btn">Add Comment</button>
+        <div id="comment-form-container"></div>
+      </section>
+    </section>
+  </script>
+
+  <!-- ========== ARTICLE FORM (ADD / EDIT) ========== -->
+  <script type="text/template" id="template-article-form">
+    <section id="article-form">
+      <h2>
+        {{#isEdit}}Upraviť článok{{/isEdit}}
+        {{^isEdit}}Nový článok{{/isEdit}}
+      </h2>
+
+      <form id="article-edit-form">
+        <div class="field">
+          <label for="art-title">Nadpis *</label>
+          <input id="art-title" name="title" type="text" value="{{title}}" required>
+        </div>
+
+        <div class="field">
+          <label for="art-author">Autor *</label>
+          <input id="art-author" name="author" type="text" value="{{author}}" required>
+        </div>
+
+        <div class="field">
+          <label for="art-content">Obsah *</label>
+          <textarea id="art-content" name="content" rows="8" required>{{content}}</textarea>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn primary">Uložiť</button>
+          <a href="#articles?offset={{backOffset}}" class="btn">Zrušiť</a>
+        </div>
+      </form>
+    </section>
+  </script>
+
+  <!-- ========== VISITOR OPINIONS ========== -->
+  <script type="text/template" id="template-opinions">
+    <section>
+      <h2>Najnovšie názory</h2>
+      <div id="stats" class="avg-rating" aria-live="polite">
+        {{#hasStats}}
+          Priemerné hodnotenie: {{avgRating}} / 5 ({{count}} hodnotení)
+        {{/hasStats}}
+        {{^hasStats}}
+          Zatiaľ nebol pridaný žiadny názor.
+        {{/hasStats}}
+      </div>
+
+      <div id="opinionsContainer" aria-live="polite">
+        {{#opinions}}
+        <article class="opinion-card" data-id="{{id}}">
+          <header>
+            <h4>{{name}}</h4>
+            <span class="opinion-meta">{{dateOnly}}</span>
+          </header>
+          <div class="opinion-meta">
+            E-mail: <a href="mailto:{{email}}">{{email}}</a>
+          </div>
+          <div>
+            <strong>Hodnotenie:</strong> {{stars}}
+            <span class="opinion-meta">({{ratingNumber}}/5)</span>
+          </div>
+          <div>
+            Preferencia: {{preferenceText}} | Vráti sa: {{willReturnText}}
+          </div>
+          <div>
+            <strong>Spokojnosť:</strong> {{satisfaction}}
+          </div>
+          {{#hasKeywords}}
+          <div class="opinion-keywords">
+            <strong>Kľúčové slová:</strong> {{keywordsText}}
+          </div>
+          {{/hasKeywords}}
+          <p>{{text}}</p>
+          {{#imageUrl}}
+          <img class="opinion-img" alt="Obrázok od používateľa" src="{{imageUrl}}">
+          {{/imageUrl}}
+        </article>
+        {{/opinions}}
+      </div>
+    </section>
+  </script>
+
+  <!-- ========== ADD OPINION FORM ========== -->
+  <script type="text/template" id="template-addOpinion">
+    <section>
+      <h2>Formulár návštevníka</h2>
+
+      <form id="opinion-form" class="opinion-form" novalidate>
+        <div class="field">
+          <label for="name">Meno *</label>
+          <input id="name" name="name" type="text" required />
+        </div>
+
+        <div class="field">
+          <label for="email">E-mail *</label>
+          <input id="email" name="email" type="email" required />
+        </div>
+
+        <div class="field rating-wrap">
+          <span>Hodnotenie (1–5) *</span>
+          <div class="rating">
+            <!-- reversed order = star widget -->
+            <input type="radio" id="rate5" name="rating" value="5" required />
+            <label for="rate5" title="5 hviezdičiek"></label>
+
+            <input type="radio" id="rate4" name="rating" value="4" />
+            <label for="rate4" title="4 hviezdičky"></label>
+
+            <input type="radio" id="rate3" name="rating" value="3" />
+            <label for="rate3" title="3 hviezdičky"></label>
+
+            <input type="radio" id="rate2" name="rating" value="2" />
+            <label for="rate2" title="2 hviezdičky"></label>
+
+            <input type="radio" id="rate1" name="rating" value="1" />
+            <label for="rate1" title="1 hviezdička"></label>
+          </div>
+          <p class="rating-help">Kliknite na hviezdičku pre hodnotenie.</p>
+        </div>
+
+        <div class="field">
+          <label>Čo preferujete?</label>
+          <div class="options">
+            <label><input type="radio" name="preference" value="AI nástroje" checked /> AI nástroje</label>
+            <label><input type="radio" name="preference" value="Klasické články" /> Klasické články</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Vrátili by ste sa na blog?</label>
+          <div class="options">
+            <label><input type="radio" name="willReturn" value="Áno" checked /> Áno</label>
+            <label><input type="radio" name="willReturn" value="Nie" /> Nie</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="satisfaction">Celková spokojnosť</label>
+          <select id="satisfaction" name="satisfaction">
+            <option value="veľmi spokojný/á">Veľmi spokojný/á</option>
+            <option value="spokojný/á">Spokojný/á</option>
+            <option value="neutrálny">Neutrálny</option>
+            <option value="nespokojný/á">Nespokojný/á</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="keywords">Kľúčové slová (oddeľte čiarkou)</label>
+          <input id="keywords" name="keywords" type="text" placeholder="chatbot, LLM, industry 5.0" />
+        </div>
+
+        <div class="field">
+          <label for="imageUrl">URL obrázka (nepovinné)</label>
+          <input id="imageUrl" name="imageUrl" type="url" placeholder="https://..." />
+        </div>
+
+        <div class="field">
+          <label for="text">Váš názor *</label>
+          <textarea id="text" name="text" rows="4" required></textarea>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="btn primary">Odoslať názor</button>
+          <button type="reset" class="btn">Zmazať formulár</button>
+        </div>
+      </form>
+    </section>
+  </script>
+
+  <!-- SPA scripts -->
+  <script src="js/googleSignIn.js"></script>
+  <script src="js/paletteToggle.js"></script>
+  <script src="js/mobileNav.js"></script>
+  <script type="module" src="js/routerInit.js"></script>
+</body>
+</html>

@@ -2,10 +2,11 @@ import { ArticleFormsHandler } from "./articleFormsHandler.js";
 
 const BASE_URL = "https://wt.kpi.fei.tuke.sk/api";
 const articleFormsHandler = new ArticleFormsHandler(BASE_URL);
+const API_COOLDOWN_KEY = "wt_api_cooldown_until";
 
 // ===== Resilient fetch helpers (timeout + retry + cache) =====
 const ARTICLES_CACHE_KEY = "articles_cache_v1";
-const API_TIMEOUT_MS = 15000; // 15s client timeout
+const API_TIMEOUT_MS = 65000; // 65s client timeout
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -49,6 +50,17 @@ function setArticlesState(target, state, extra = {}) {
     const btn = document.getElementById("retry-load-articles");
     if (btn) btn.addEventListener("click", () => extra.onRetry && extra.onRetry());
   }
+}
+
+
+async function loadFallbackArticles(offset = 0) {
+  const res = await fetch("./data/articles_fallback.json", { cache: "no-store" });
+  if (!res.ok) throw new Error(`Fallback HTTP ${res.status}`);
+  const data = await res.json();
+
+  // simulate pagination fields your template expects
+  if (data.meta) data.meta.offset = offset;
+  return JSON.stringify(data);
 }
 
 
@@ -196,28 +208,13 @@ function fetchAndDisplayArticles(targetElm, params) {
     setArticlesState(target, "loading");
 
     // If upstream is in cooldown, don't even try the API — use cache/fallback.
-    const cooldownUntil = getCooldownUntil();
-    if (cooldownUntil && Date.now() < cooldownUntil) {
-      // cache per offset first
-      try {
-        const cached = localStorage.getItem(ARTICLES_CACHE_KEY + `:${offset}`);
-        if (cached) {
-          const { text } = JSON.parse(cached);
-          setArticlesState(target, "error_cached");
-          handleArticlesSuccess(text, listTpl, target, offset, pageSize);
-          return;
-        }
-      } catch (_) {}
-
-      // then fallback JSON
-      try {
-        const text = await loadFallbackResponseText(pageSize, offset);
-        setArticlesState(target, "error_cached");
-        handleArticlesSuccess(text, listTpl, target, offset, pageSize);
-        return;
-      } catch (_) {
-        // fall through
-      }
+    const cooldownUntil = Number(localStorage.getItem(API_COOLDOWN_KEY) || "0");
+    if (Date.now() < cooldownUntil) {
+      // skip WT immediately, go fallback
+      const fallbackText = await loadFallbackArticles(offset);
+      setArticlesState(target, "error_cached");
+      handleArticlesSuccess(fallbackText, listTpl, target, offset, pageSize);
+      return;
     }
 
     // Try API up to 3 times (2 retries) with backoff.
@@ -237,7 +234,7 @@ function fetchAndDisplayArticles(targetElm, params) {
 
         // cache last good response (per offset)
         try {
-          localStorage.setItem(ARTICLES_CACHE_KEY + `:${offset}`, JSON.stringify({ ts: Date.now(), text }));
+          localStorage.setItem(API_COOLDOWN_KEY, String(Date.now() + 2 * 60 * 1000)); // 2 minutes
         } catch (_) {}
 
         return;
@@ -273,9 +270,17 @@ function fetchAndDisplayArticles(targetElm, params) {
       return;
     } catch (_) {}
 
-    // render error template and wire retry
-    target.innerHTML = Mustache.render(errorTpl.innerHTML, {});
-    document.getElementById("retry-load-articles")?.addEventListener("click", onRetry);
+    // try fallback JSON (site must not look dead)
+    try {
+      const fallbackText = await loadFallbackArticles(offset);
+      setArticlesState(target, "error_cached"); // reuse the “API down” message
+      handleArticlesSuccess(fallbackText, listTpl, target, offset, pageSize);
+      return;
+    } catch (e) {
+      // final: render error
+      target.innerHTML = Mustache.render(errorTpl.innerHTML, {});
+      document.getElementById("retry-load-articles")?.addEventListener("click", onRetry);
+    }
   })();
 }
 

@@ -3,14 +3,14 @@
     {
       "id": "fallback-1",
       "title": "WT API is currently unavailable",
-      "author": "System",
+      "author": "Samuel",
       "dateCreated": "2025-12-12",
       "content": "The upstream WT server timed out (504). This is a local fallback article so your website still works. Replace this file with real exported articles if you want reliability."
     },
     {
       "id": "fallback-2",
       "title": "How to make this site reliable",
-      "author": "System",
+      "author": "Samuel",
       "dateCreated": "2025-12-12",
       "content": "Solution: snapshot articles into /data/articles_fallback.json during build, or host your own backend. Client-side cannot fix a 504 from wt.kpi.fei.tuke.sk."
     }

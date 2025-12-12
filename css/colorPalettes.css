@@ -1,0 +1,259 @@
+/* ============================================================
+   PALETTE COLLECTION — FANTASY / CYBER COLOR SETS
+   Each palette has LIGHT and DARK variants.
+   ============================================================ */
+
+
+/* ========== a) FANTASY SKY – purple / magenta / blue ========== */
+
+/* LIGHT */
+:root.palette-fantasy-sky-light {
+  --bg: #EA6DC9;        /* soft pink */
+  --panel: #FDF2FF;     /* very light panel */
+  --text: #130552;      /* deep purple */
+  --muted: #65026D;
+
+  --brand: #6F85FE;     /* blue primary */
+  --brand-weak: #991FA6;
+  --accent: #E70D98;    /* magenta accent */
+
+  --border: #F9D8F5;
+  --table-stripe: #F8E2FB;
+  --shadow: 0 6px 20px rgba(19, 5, 82, 0.22);
+}
+
+/* DARK */
+:root.palette-fantasy-sky-dark {
+  --bg: #130552;
+  --panel: #241457;
+  --text: #FBE9FF;
+  --muted: #C79FEA;
+
+  --brand: #6F85FE;
+  --brand-weak: #E70D98;
+  --accent: #FF4FD8;
+
+  --border: #2441E1;
+  --table-stripe: #1A0638;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+
+
+/* ========== b) FANTASY FOREST – purple / cyan / yellow ========== */
+
+/* LIGHT */
+:root.palette-fantasy-forest-light {
+  --bg: #F5F0A1;        /* soft yellow */
+  --panel: #FFFFFF;
+  --text: #1E2F59;      /* deep blue */
+  --muted: #5C469A;
+
+  --brand: #398c8f;     /* cyan */
+  --brand-weak: #884CA7;
+  --accent: #115B90;
+
+  --border: #DDE8AA;
+  --table-stripe: #E9F8D0;
+  --shadow: 0 6px 20px rgba(17, 43, 89, 0.22);
+}
+
+/* DARK */
+:root.palette-fantasy-forest-dark {
+  --bg: #0F2D34;
+  --panel: #10263A;
+  --text: #EAFBF9;
+  --muted: #9CA3AF;
+
+  --brand: #398c8f;
+  --brand-weak: #F5F0A1;
+  --accent: #884CA7;
+
+  --border: #115B90;
+  --table-stripe: #071821;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+
+
+/* ========== c) DAY & NIGHT – earthy + pastel lights ========== */
+
+/* LIGHT */
+:root.palette-daynight-light {
+  --bg: #FFF6BD;        /* soft yellow */
+  --panel: #FFFFFF;
+  --text: #4B3A34;      /* derived from #79534A */
+  --muted: #79534A;
+
+  --brand: #6FBFC7;     /* aqua */
+  --brand-weak: #C3A9D8;
+  --accent: #8E549A;
+
+  --border: #F0DFC0;
+  --table-stripe: #FDF0C8;
+  --shadow: 0 6px 20px rgba(73, 59, 52, 0.2);
+}
+
+/* DARK */
+:root.palette-daynight-dark {
+  --bg: #2A1B1A;
+  --panel: #3B2523;
+  --text: #FFF6E8;
+  --muted: #C3A9D8;
+
+  --brand: #6FBFC7;
+  --brand-weak: #9175AF;
+  --accent: #FFF6BD;
+
+  --border: #6FBFC7;
+  --table-stripe: #231513;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+
+
+/* ========== d) COLORFUL PHOENIX – warm fire + cool cyan ========== */
+
+/* LIGHT */
+:root.palette-phoenix-light {
+  --bg: #FEDD9D;
+  --panel: #FFFFFF;
+  --text: #262E4E;
+  --muted: #86779B;
+
+  --brand: #F96134;     /* orange */
+  --brand-weak: #6FE0F4;/* cyan */
+  --accent: #AE2219;    /* deep red */
+
+  --border: #FAD7B4;
+  --table-stripe: #FFE7BE;
+  --shadow: 0 6px 20px rgba(38, 46, 78, 0.22);
+}
+
+/* DARK */
+:root.palette-phoenix-dark {
+  --bg: #262E4E;
+  --panel: #1A223E;
+  --text: #FFF4E6;
+  --muted: #A5A0C0;
+
+  --brand: #F96134;
+  --brand-weak: #07BBF4;
+  --accent: #FEDD9D;
+
+  --border: #F2844F;
+  --table-stripe: #161B33;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+
+
+/* ========== e) DARK SAKURA – deep reds + teal water ========== */
+
+/* LIGHT */
+:root.palette-dark-sakura-light {
+  --bg: #F9CCCB;
+  --panel: #FFFFFF;
+  --text: #450A18;
+  --muted: #7B182F;
+
+  --brand: #C43556;
+  --brand-weak: #86DDE4;
+  --accent: #197074;
+
+  --border: #F4B2B5;
+  --table-stripe: #FCE0E1;
+  --shadow: 0 6px 20px rgba(69, 10, 24, 0.2);
+}
+
+/* DARK */
+:root.palette-dark-sakura-dark {
+  --bg: #082D36;
+  --panel: #102837;
+  --text: #FCEBED;
+  --muted: #C48A98;
+
+  --brand: #C43556;
+  --brand-weak: #86DDE4;
+  --accent: #F9CCCB;
+
+  --border: #197074;
+  --table-stripe: #041821;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+
+
+/* ========== f) GRAY MOONSPACE – cool blue/gray sci-fi ========== */
+
+/* LIGHT */
+:root.palette-moonspace-light {
+  --bg: #94CFDB;
+  --panel: #FFFFFF;
+  --text: #28151C;
+  --muted: #3E5565;
+
+  --brand: #375B6D;
+  --brand-weak: #7395AB;
+  --accent: #2C303A;
+
+  --border: #C7E4EE;
+  --table-stripe: #E0F1F7;
+  --shadow: 0 6px 20px rgba(40, 21, 28, 0.18);
+}
+
+/* DARK */
+:root.palette-moonspace-dark {
+  --bg: #28151C;
+  --panel: #2C303A;
+  --text: #E7F6FF;
+  --muted: #7395AB;
+
+  --brand: #94CFDB;
+  --brand-weak: #375B6D;
+  --accent: #FFFFFF;
+
+  --border: #3E5565;
+  --table-stripe: #211219;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+
+
+/* ========== h) RED ON SNOW – cold blue + striking crimson ========== */
+
+/* LIGHT */
+:root.palette-red-snow-light {
+  --bg: #E1FDFE;
+  --panel: #FFFFFF;
+  --text: #77080E;
+  --muted: #706F8B;
+
+  --brand: #4b5461;
+  --brand-weak: #49273F;
+  --accent: #77080E;
+
+  --border: #CFE9F2;
+  --table-stripe: #E8F4FB;
+  --shadow: 0 6px 20px rgba(33, 24, 40, 0.18);
+}
+
+/* DARK */
+:root.palette-red-snow-dark {
+  --bg: #211828;
+  --panel: #2B2034;
+  --text: #E1FDFE;
+  --muted: #9FA8C6;
+
+  --brand: #8097B7;
+  --brand-weak: #E1FDFE;
+  --accent: #570210;
+
+  --border: #49273F;
+  --table-stripe: #1A131F;
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* ============================================================
+   END OF COLOR PALETTES
+   ============================================================ */

@@ -1,12 +1,18 @@
 # Ignore everything by default
 *
 
-# But keep these tracked
+# Keep git/meta files
 !.gitignore
 !README.md
-!ai-tech-blog/
-!ai-tech-blog/**
+!index.html
 
-# Optional: keep IDE config out
+# Keep CSS and JS folders AND their contents
+!css/
+!css/**
+
+!js/
+!js/**
+
+# Ignore IDE junk
 .idea/
 .vscode/

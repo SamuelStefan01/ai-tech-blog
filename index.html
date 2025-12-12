@@ -9,12 +9,18 @@
         content="327532328134-tmtf1h4pcukg5vugn7f0g2bs41o89o5o.apps.googleusercontent.com">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <link rel="stylesheet" href="css/screenStyle.css" media="screen" />
-  <link rel="stylesheet" href="css/printStyle.css" media="print" />
-  <link rel="stylesheet" href="css/colorPalettes.css" media="screen" />
+  <link rel="stylesheet" href="./css/screenStyle.css" media="screen" />
+  <link rel="stylesheet" href="./css/printStyle.css" media="print" />
+  <link rel="stylesheet" href="./css/colorPalettes.css" media="screen" />
 
   <!-- Mustache template engine -->
   <script src="https://unpkg.com/mustache@4.2.0/mustache.min.js"></script>
+
+    <meta property="og:title" content="AI Tech Blog">
+    <meta property="og:description" content="Articles about AI and tech.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://samuel-stefan-ai-tech-blog.netlify.app/">
+    
 </head>
 
 <body>
@@ -233,6 +239,7 @@
     <section id="articles">
       <h2>Články</h2>
       <p>Nepodarilo sa načítať články zo servera. Skúste to neskôr znova.</p>
+      <button id="retry-load-articles" type="button">Retry</button>
     </section>
   </script>
 
@@ -442,9 +449,9 @@
   </script>
 
   <!-- SPA scripts -->
-  <script src="js/googleSignIn.js"></script>
-  <script src="js/paletteToggle.js"></script>
-  <script src="js/mobileNav.js"></script>
-  <script type="module" src="js/routerInit.js"></script>
+  <script src="./js/googleSignIn.js"></script>
+  <script src="./js/paletteToggle.js"></script>
+  <script src="./js/mobileNav.js"></script>
+  <script type="module" src="./js/routerInit.js"></script>
 </body>
 </html>

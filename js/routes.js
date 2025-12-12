@@ -3,6 +3,55 @@ import { ArticleFormsHandler } from "./articleFormsHandler.js";
 const BASE_URL = "https://wt.kpi.fei.tuke.sk/api";
 const articleFormsHandler = new ArticleFormsHandler(BASE_URL);
 
+// ===== Resilient fetch helpers (timeout + retry + cache) =====
+const ARTICLES_CACHE_KEY = "articles_cache_v1";
+const API_TIMEOUT_MS = 8000;
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchTextWithTimeout(url, ms = API_TIMEOUT_MS) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal, cache: "no-store" });
+    const text = await res.text();
+    return { res, text };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+function setArticlesState(target, state, extra = {}) {
+  if (!target) return;
+
+  if (state === "loading") {
+    target.innerHTML = "<section id=\"articles\"><h2>Články</h2><p>Loading articles…</p></section>";
+    return;
+  }
+
+  if (state === "empty") {
+    target.innerHTML = "<section id=\"articles\"><h2>Články</h2><p>No articles available.</p></section>";
+    return;
+  }
+
+  if (state === "error_cached") {
+    target.innerHTML =
+      "<section id=\"articles\"><h2>Články</h2><p>API is down. Showing cached articles.</p></section>";
+    return;
+  }
+
+  if (state === "error") {
+    // If there is a template, caller will render it; this is a fallback.
+    target.innerHTML =
+      "<section id=\"articles\"><h2>Články</h2><p>Nepodarilo sa načítať články zo servera.</p><button id=\"retry-load-articles\" type=\"button\">Retry</button></section>";
+    const btn = document.getElementById("retry-load-articles");
+    if (btn) btn.addEventListener("click", () => extra.onRetry && extra.onRetry());
+  }
+}
+
+
 // ===== Routes config for SPA =====
 
 export const routes = [
@@ -119,29 +168,61 @@ function fetchAndDisplayArticles(targetElm, params) {
 
   if (!target || !listTpl || !errorTpl) return;
 
-  const pageSize = 20;
+  const pageSize = 10; // smaller page → fewer 504s
   const offset = params && params.offset ? Number(params.offset) || 0 : 0;
-
   const url = `${BASE_URL}/article?max=${pageSize}&offset=${offset}`;
 
-  const xhr = new XMLHttpRequest();
-  xhr.open("GET", url, true);
+  const onRetry = () => fetchAndDisplayArticles(targetElm, params);
 
-  xhr.onload = () => {
-    if (xhr.status >= 200 && xhr.status < 300) {
-      handleArticlesSuccess(xhr.responseText, listTpl, target, offset, pageSize);
-    } else {
-      console.error("Articles request failed", xhr.status, xhr.responseText);
-      target.innerHTML = Mustache.render(errorTpl.innerHTML, {});
+  (async () => {
+    setArticlesState(target, "loading");
+
+    // try up to 3 times (2 retries) with backoff
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { res, text } = await fetchTextWithTimeout(url, API_TIMEOUT_MS);
+
+        if (!res.ok) {
+          const err = new Error(`HTTP ${res.status}`);
+          err.status = res.status;
+          err.body = text;
+          throw err;
+        }
+
+        handleArticlesSuccess(text, listTpl, target, offset, pageSize);
+
+        // cache last good response (per offset)
+        try {
+          localStorage.setItem(ARTICLES_CACHE_KEY + `:${offset}`, JSON.stringify({ ts: Date.now(), text }));
+        } catch (_) {}
+
+        // attach retry button if template contains it (no harm if missing)
+        document.getElementById("retry-load-articles")?.addEventListener("click", onRetry);
+        return;
+      } catch (e) {
+        // dev logging
+        if (location.hostname === "localhost") {
+          console.error("Articles fetch failed:", e.message, e.status, e.body);
+        }
+        if (attempt < 2) await sleep(500 * (attempt + 1));
+      }
     }
-  };
 
-  xhr.onerror = () => {
-    console.error("Network error while loading articles");
+    // fallback to cache
+    try {
+      const cached = localStorage.getItem(ARTICLES_CACHE_KEY + `:${offset}`);
+      if (cached) {
+        const { text } = JSON.parse(cached);
+        setArticlesState(target, "error_cached");
+        handleArticlesSuccess(text, listTpl, target, offset, pageSize);
+        return;
+      }
+    } catch (_) {}
+
+    // render error template and wire retry
     target.innerHTML = Mustache.render(errorTpl.innerHTML, {});
-  };
-
-  xhr.send();
+    document.getElementById("retry-load-articles")?.addEventListener("click", onRetry);
+  })();
 }
 
 // ===== Article detail view (AJAX) =====
@@ -159,19 +240,16 @@ function fetchAndDisplayArticleDetail(targetElm, params) {
   }
 
   const url = `${BASE_URL}/article/${encodeURIComponent(id)}`;
+  const onRetry = () => fetchAndDisplayArticleDetail(targetElm, params);
 
-  const xhr = new XMLHttpRequest();
-  xhr.open("GET", url, true);
+  (async () => {
+    target.innerHTML = "<p>Loading article…</p>";
 
-  xhr.onload = () => {
-    if (xhr.status >= 200 && xhr.status < 300) {
-      let data;
-      try {
-        data = JSON.parse(xhr.responseText);
-      } catch (e) {
-        target.innerHTML = "<p>Chybná odpoveď servera.</p>";
-        return;
-      }
+    try {
+      const { res, text } = await fetchTextWithTimeout(url, API_TIMEOUT_MS);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = JSON.parse(text);
 
       const viewData = {
         id: data.id,
@@ -180,47 +258,28 @@ function fetchAndDisplayArticleDetail(targetElm, params) {
         dateCreated: data.dateCreated ? data.dateCreated.substring(0, 10) : "",
         content: data.content || "",
         backOffset,
-        comments: data.comments || []
+        comments: []
       };
+
+      // load comments (best-effort)
+      try {
+        const commentsUrl = `${BASE_URL}/article/${encodeURIComponent(id)}/comment`;
+        const { res: rc, text: tc } = await fetchTextWithTimeout(commentsUrl, API_TIMEOUT_MS);
+        if (rc.ok) {
+          viewData.comments = JSON.parse(tc) || [];
+        }
+      } catch (_) {
+        viewData.comments = [];
+      }
 
       target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
-
-      // load comments
-      const commentsUrl = `${BASE_URL}/article/${encodeURIComponent(id)}/comment`;
-      const xhrComments = new XMLHttpRequest();
-      xhrComments.open("GET", commentsUrl, true);
-
-      xhrComments.onload = () => {
-        let comments = [];
-        if (xhrComments.status >= 200 && xhrComments.status < 300) {
-          try {
-            comments = JSON.parse(xhrComments.responseText);
-          } catch (e) {
-            comments = [];
-          }
-        }
-        viewData.comments = comments || [];
-        target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
-        initCommentForm(id, backOffset);
-      };
-
-      xhrComments.onerror = () => {
-        viewData.comments = [];
-        target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
-        initCommentForm(id, backOffset);
-      };
-
-      xhrComments.send();
-    } else {
-      target.innerHTML = "<p>Nepodarilo sa načítať článok.</p>";
+      initCommentForm(id, backOffset);
+    } catch (e) {
+      target.innerHTML = `<p>Nepodarilo sa načítať článok.</p><button id="retry-article" type="button">Retry</button>`;
+      document.getElementById("retry-article")?.addEventListener("click", onRetry);
+      if (location.hostname === "localhost") console.error("Article detail fetch failed:", e);
     }
-  };
-
-  xhr.onerror = () => {
-    target.innerHTML = "<p>Chyba siete pri načítaní článku.</p>";
-  };
-
-  xhr.send();
+  })();
 }
 
 // ===== Comment form handling =====

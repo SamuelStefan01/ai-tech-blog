@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://samuel-stefan-ai-tech-blog.netlify.app/sitemap.xml

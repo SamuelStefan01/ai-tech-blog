@@ -31,8 +31,29 @@ export class ParamHashRouter {
     if (!route || typeof route.getTemplate !== "function") return;
 
     route.getTemplate(route.target, params);
+    this.setDocumentTitle(hash, params);
     this.updateActiveLink(hash);
   }
+
+
+  setDocumentTitle(hash, params) {
+    const base = "AI Tech Blog";
+    const titles = {
+      welcome: `${base} | Welcome`,
+      articles: `${base} | Articles`,
+      article: `${base} | Article`,
+      addArticle: `${base} | Add Article`
+    };
+
+    // include id for article detail
+    if (hash === "article" && params && params.id) {
+      document.title = `${base} | Article #${params.id}`;
+      return;
+    }
+
+    document.title = titles[hash] || base;
+  }
+
 
   // Mark active menu link
   updateActiveLink(hash) {

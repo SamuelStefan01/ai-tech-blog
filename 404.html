@@ -4,14 +4,22 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <title>AI & Tech Blog – SPA</title>
+  <title>AI & Tech Blog</title>
+  <meta name="description" content="AI & Tech Blog – články o umelej inteligencii, LLM a generatívnej AI.">
+  <link rel="canonical" href="">
+  <meta property="og:title" content="AI & Tech Blog">
+  <meta property="og:description" content="Články o AI, LLM a generatívnej AI.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="">
+  <meta property="og:image" content="">
+
   <meta name="google-signin-client_id"
         content="327532328134-tmtf1h4pcukg5vugn7f0g2bs41o89o5o.apps.googleusercontent.com">
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 
-  <link rel="stylesheet" href="css/screenStyle.css" media="screen" />
-  <link rel="stylesheet" href="css/printStyle.css" media="print" />
-  <link rel="stylesheet" href="css/colorPalettes.css" media="screen" />
+  <link rel="stylesheet" href="./css/screenStyle.css" media="screen" />
+  <link rel="stylesheet" href="./css/printStyle.css" media="print" />
+  <link rel="stylesheet" href="./css/colorPalettes.css" media="screen" />
 
   <!-- Mustache template engine -->
   <script src="https://unpkg.com/mustache@4.2.0/mustache.min.js"></script>
@@ -187,6 +195,15 @@
   </script>
 
   <!-- ========== ARTICLES FROM WT SERVER ========== -->
+
+  <script type="text/template" id="template-articles-loading">
+    <section id="articles">
+      <h2>Články</h2>
+      <p>Načítavam články…</p>
+    </section>
+  </script>
+
+
   <script type="text/template" id="template-articles">
     <section id="articles">
       <h2>Články z WT servera</h2>
@@ -232,7 +249,8 @@
   <script type="text/template" id="template-articles-error">
     <section id="articles">
       <h2>Články</h2>
-      <p>Nepodarilo sa načítať články zo servera. Skúste to neskôr znova.</p>
+      <p>Nepodarilo sa načítať články zo servera (API nedostupné / timeout).</p>
+      <button class="btn" id="retry-articles">Retry</button>
     </section>
   </script>
 
@@ -442,9 +460,21 @@
   </script>
 
   <!-- SPA scripts -->
-  <script src="js/googleSignIn.js"></script>
-  <script src="js/paletteToggle.js"></script>
-  <script src="js/mobileNav.js"></script>
-  <script type="module" src="js/routerInit.js"></script>
+  <script src="./js/googleSignIn.js"></script>
+  <script src="./js/paletteToggle.js"></script>
+  <script src="./js/mobileNav.js"></script>
+  <script type="module" src="./js/routerInit.js"></script>
+
+  <script>
+    // Fill canonical + OG url dynamically based on current origin + pathname (works on GitHub Pages/Netlify)
+    (function setMetaUrls(){
+      const base = window.location.origin + window.location.pathname;
+      const canon = document.querySelector('link[rel="canonical"]');
+      const ogUrl = document.querySelector('meta[property="og:url"]');
+      if (canon) canon.setAttribute('href', base);
+      if (ogUrl) ogUrl.setAttribute('content', base);
+    })();
+  </script>
+
 </body>
 </html>

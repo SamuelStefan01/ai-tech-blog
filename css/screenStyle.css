@@ -989,3 +989,7 @@ html[data-theme="dark"] thead th {
 html[data-theme="dark"] tfoot td {
   background: var(--panel);
 }
+
+
+/* Status banner for offline/cached content */
+.status-banner{padding:0.75rem 1rem;margin:0 0 1rem 0;border:1px solid currentColor;border-radius:0.75rem;opacity:0.9;font-size:0.95rem}

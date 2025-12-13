@@ -1,29 +1,152 @@
 {
   "articles": [
     {
-      "id": "fallback-1",
-      "title": "WT API is currently unavailable",
-      "author": "Samuel",
-      "dateCreated": "2025-12-12",
+      "id": "fb-001",
+      "title": "AI vs. Machine Learning vs. Deep Learning (without the marketing fluff)",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
       "tags": [
-        "Status",
-        "Infrastructure"
+        "AI",
+        "ML",
+        "Deep Learning",
+        "Basics"
       ],
-      "content": "<p>The upstream WT server is currently unreachable. This is an <strong>offline fallback</strong> article so the website stays usable.</p><p>When WT comes back, the app will switch to live articles automatically and cache them.</p>"
+      "content": "<p>People throw “AI”, “machine learning”, and “deep learning” around like they mean the same thing. They don’t.</p><h3>AI</h3><p><strong>Artificial Intelligence</strong> is the umbrella: any system that performs tasks that normally require human intelligence.</p><h3>Machine Learning</h3><p><strong>ML</strong> learns patterns from data (linear regression, trees, forests).</p><h3>Deep Learning</h3><p><strong>DL</strong> is ML with multi-layer neural networks, great for text/images/audio.</p><h3>Quick rule</h3><ul><li>Rules: AI (not ML).</li><li>Learned from data: ML (maybe DL).</li><li>Multi-layer nets: DL.</li></ul>"
     },
     {
-      "id": "fallback-2",
-      "title": "How this site stays reliable when the backend dies",
-      "author": "Samuel",
-      "dateCreated": "2025-12-12",
+      "id": "fb-002",
+      "title": "How neural networks actually learn (a practical mental model)",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
       "tags": [
-        "Engineering",
-        "Reliability"
+        "Deep Learning",
+        "Neural Networks",
+        "Math-lite"
       ],
-      "content": "<p>This project uses a provider chain: <em>cache → WT → backup CDN/raw → local seed</em>.</p><ul><li>If WT fails, users still see articles.</li><li>Search & filters still work.</li><li>Comments can be stored locally when POST fails.</li></ul>"
+      "content": "<p>Neural networks don’t “understand” data. They optimize weights to reduce a loss.</p><ol><li>Forward pass</li><li>Loss</li><li>Backprop gradients</li><li>Gradient descent updates</li></ol><p>Failures are usually bad data, bad optimization, or wrong objective.</p>"
+    },
+    {
+      "id": "fb-003",
+      "title": "Overfitting explained with one brutal example",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "ML",
+        "Generalization",
+        "Evaluation"
+      ],
+      "content": "<p>Overfitting = great on training, bad on new data.</p><p>Example: memorizing “Street A houses cost 200k” fails on “Street B”.</p><p>Fix with more data, regularization, simpler models, early stopping, and proper validation.</p>"
+    },
+    {
+      "id": "fb-004",
+      "title": "Train/test splits: why 80/20 isn’t a magic spell",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "ML",
+        "Evaluation",
+        "Best Practices"
+      ],
+      "content": "<p>80/20 isn’t a law. Use cross-validation for small datasets, chronological splits for time series, stratification for imbalance.</p><p>What matters: no leakage and realistic evaluation.</p>"
+    },
+    {
+      "id": "fb-005",
+      "title": "Data leakage: the silent killer of ML projects",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "ML",
+        "Data",
+        "Pitfalls"
+      ],
+      "content": "<p>Leakage happens when training sees info not available at prediction time.</p><ul><li>Fit scalers on full data</li><li>Target-derived features</li><li>Duplicates across splits</li><li>Shuffled time series</li></ul><p>Split first. Preprocess second. Use pipelines.</p>"
+    },
+    {
+      "id": "fb-006",
+      "title": "Prompt engineering that isn’t cringe: 5 patterns that work",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "LLM",
+        "Prompting",
+        "Productivity"
+      ],
+      "content": "<p>Useful patterns: constraints, examples, plan-then-execute, forced checks, and splitting tasks into steps.</p>"
+    },
+    {
+      "id": "fb-007",
+      "title": "RAG in plain language: how to reduce hallucinations (sometimes)",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "LLM",
+        "RAG",
+        "Search"
+      ],
+      "content": "<p>RAG = retrieve relevant docs first, then generate grounded in them.</p><p>Good retrieval beats fancy prompting. Measure it.</p>"
+    },
+    {
+      "id": "fb-008",
+      "title": "Why AI models fail in production (and it’s not the model)",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "AI",
+        "MLOps",
+        "Production"
+      ],
+      "content": "<p>Production failures are usually drift, skew, latency, missing monitoring, or workflow mismatch.</p>"
+    },
+    {
+      "id": "fb-009",
+      "title": "A checklist for writing technical articles people actually read",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "Writing",
+        "Tech Blog",
+        "Guides"
+      ],
+      "content": "<ul><li>Start with the problem</li><li>Short paragraphs</li><li>Headings often</li><li>Examples early</li><li>End with next steps</li></ul>"
+    },
+    {
+      "id": "fb-010",
+      "title": "Search and filters UX: what users expect (and what breaks trust)",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "UX",
+        "Search",
+        "Frontend"
+      ],
+      "content": "<p>Search must be predictable: title/author/content, URL-persisted filters, clear empty-state + reset.</p>"
+    },
+    {
+      "id": "fb-011",
+      "title": "SEO for SPAs: what you can do without a backend",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "SEO",
+        "SPA",
+        "Frontend"
+      ],
+      "content": "<p>Set title + description per route, OpenGraph tags, canonical URLs, and JSON-LD for articles. SSR/prerender is best but not required for basics.</p>"
+    },
+    {
+      "id": "fb-012",
+      "title": "Reliability engineering for student projects: design for failure",
+      "author": "Samuel Stefan",
+      "dateCreated": "2025-12-13",
+      "tags": [
+        "Reliability",
+        "Engineering",
+        "Best Practices"
+      ],
+      "content": "<p>Use a provider chain: cache → primary API → backup → local seed. Show an offline banner so users trust the system.</p>"
     }
   ],
   "meta": {
-    "totalCount": 2
+    "totalCount": 12
   }
 }

@@ -9,6 +9,7 @@
 !_redirects
 !robots.txt
 !sitemap.xml
+!netlify.toml
 
 # Keep CSS and JS folders AND their contents
 !css/
@@ -22,6 +23,9 @@
 
 !data/
 !data/**
+
+!netlify/
+!netlify/**
 
 # Ignore IDE junk
 .idea/

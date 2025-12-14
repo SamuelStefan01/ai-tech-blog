@@ -3,7 +3,7 @@
     {
       "id": "fb-001",
       "title": "AI vs. Machine Learning vs. Deep Learning (without the marketing fluff)",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "AI",
@@ -16,7 +16,7 @@
     {
       "id": "fb-002",
       "title": "How neural networks actually learn (a practical mental model)",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "Deep Learning",
@@ -28,7 +28,7 @@
     {
       "id": "fb-003",
       "title": "Overfitting explained with one brutal example",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "ML",
@@ -40,7 +40,7 @@
     {
       "id": "fb-004",
       "title": "Train/test splits: why 80/20 isn’t a magic spell",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "ML",
@@ -52,7 +52,7 @@
     {
       "id": "fb-005",
       "title": "Data leakage: the silent killer of ML projects",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "ML",
@@ -64,7 +64,7 @@
     {
       "id": "fb-006",
       "title": "Prompt engineering that isn’t cringe: 5 patterns that work",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "LLM",
@@ -76,7 +76,7 @@
     {
       "id": "fb-007",
       "title": "RAG in plain language: how to reduce hallucinations (sometimes)",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "LLM",
@@ -88,7 +88,7 @@
     {
       "id": "fb-008",
       "title": "Why AI models fail in production (and it’s not the model)",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "AI",
@@ -100,7 +100,7 @@
     {
       "id": "fb-009",
       "title": "A checklist for writing technical articles people actually read",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "Writing",
@@ -112,7 +112,7 @@
     {
       "id": "fb-010",
       "title": "Search and filters UX: what users expect (and what breaks trust)",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "UX",
@@ -124,7 +124,7 @@
     {
       "id": "fb-011",
       "title": "SEO for SPAs: what you can do without a backend",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "SEO",
@@ -136,7 +136,7 @@
     {
       "id": "fb-012",
       "title": "Reliability engineering for student projects: design for failure",
-      "author": "Samuel Stefan",
+      "author": "Samuel Štefán",
       "dateCreated": "2025-12-13",
       "tags": [
         "Reliability",

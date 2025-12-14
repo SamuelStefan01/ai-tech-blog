@@ -228,7 +228,7 @@ function fetchAndDisplayArticles(targetElm, params) {
 
   if (!target || !listTpl || !errorTpl) return;
 
-  const pageSize = 10;
+  const pageSize = 4;
   const offset = params && params.offset ? Number(params.offset) || 0 : 0;
 
   const onRetry = () => {

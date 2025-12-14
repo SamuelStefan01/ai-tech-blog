@@ -11,6 +11,17 @@ const IS_GH_PAGES = location.hostname.endsWith("github.io");
 // On GitHub Pages we DO NOT call WT at all (CORS will block), so we go straight to backup/local.
 const BASE_URL = IS_NETLIFY ? "/api" : WT_BASE_URL;
 
+
+// Base path that works on GitHub Pages subpaths even if <base href="/"> is present.
+const APP_BASE = (() => {
+  // e.g. "/ai-tech-blog/" on GH Pages, "/" on Netlify root
+  const p = location.pathname;
+  return p.endsWith("/") ? p : p.replace(/\/[^\/]*$/, "/");
+})();
+
+function absFromAppBase(relPath) {
+  return location.origin + APP_BASE + relPath.replace(/^\//, "");
+}
 const articleFormsHandler = new ArticleFormsHandler(BASE_URL);
 
 // =====================
@@ -45,7 +56,7 @@ async function fetchTextWithTimeout(url, ms = API_TIMEOUT_MS) {
 // =====================
 // Fallback sources (always available)
 // =====================
-const FALLBACK_JSON_URL = "./data/articles_fallback.json";
+const FALLBACK_JSON_URL = absFromAppBase("data/articles_fallback.json");
 const BACKUP_SOURCES = [
   "https://cdn.jsdelivr.net/gh/samuelstefan01/ai-tech-blog@main/data/articles_fallback.json",
   "https://raw.githubusercontent.com/samuelstefan01/ai-tech-blog/main/data/articles_fallback.json"
@@ -76,19 +87,29 @@ function setArticlesState(target, state, extra = {}) {
   }
 }
 
+
+async function fetchJsonWithTimeout(url, ms = 3500) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const r = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 async function fetchFallbackObject() {
   // 1) Try backup sources (CDN/raw)
   for (const url of BACKUP_SOURCES) {
     try {
-      const r = await fetch(url, { cache: "no-store" });
-      if (!r.ok) continue;
-      return await r.json();
+      const j = await fetchJsonWithTimeout(url, 3500);
+      return j;
     } catch (_) {}
   }
   // 2) Local bundled JSON
-  const res = await fetch(FALLBACK_JSON_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Fallback HTTP ${res.status}`);
-  return await res.json();
+  return await fetchJsonWithTimeout(FALLBACK_JSON_URL, 3500);
 }
 
 async function loadFallbackResponseText(pageSize, offset) {

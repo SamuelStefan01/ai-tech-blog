@@ -1,18 +1,20 @@
 import { ArticleFormsHandler } from "./articleFormsHandler.js";
 
-const WT_BASE_URL = "https://wt.kpi.fei.tuke.sk/api";
-// Netlify-only: we proxy WT through a Netlify Function to bypass browser CORS.
-// On Netlify deployment, requests go to /api/* (see netlify.toml redirect) -> /.netlify/functions/wtProxy
-const PROXY_BASE_URL = "/api";
-const isNetlify = location.hostname.endsWith(".netlify.app");
-const isNetlifyDev = location.hostname === "localhost" && (location.port === "8888" || location.port === "9999");
-const BASE_URL = (location.hostname.includes("netlify.app") ? "/api" : "https://wt.kpi.fei.tuke.sk/api");
+const BASE_URL = "https://wt.kpi.fei.tuke.sk/api";
 const articleFormsHandler = new ArticleFormsHandler(BASE_URL);
 const API_COOLDOWN_KEY = "wt_api_cooldown_until";
 
+function setCooldownAfterFailure() {
+  // Prevent hammering a dead upstream; keep UI responsive by falling back quickly
+  try { localStorage.setItem(API_COOLDOWN_KEY, String(Date.now() + 2 * 60 * 1000)); } catch (_) {}
+}
+function clearCooldownOnSuccess() {
+  try { localStorage.removeItem(API_COOLDOWN_KEY); } catch (_) {}
+}
+
 // ===== Resilient fetch helpers (timeout + retry + cache) =====
 const ARTICLES_CACHE_KEY = "articles_cache_v1";
-const API_TIMEOUT_MS = 5000; // 5s client timeout
+const API_TIMEOUT_MS = 65000; // 65s client timeout
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -72,6 +74,109 @@ async function loadFallbackArticles(offset = 0) {
 
 // Local fallback (keeps the site usable when WT API is down)
 const FALLBACK_JSON_URL = "./data/articles_fallback.json";
+
+// Optional backup source (e.g., GitHub raw JSON). If empty, backup step is skipped.
+const BACKUP_JSON_URL = "https://cdn.jsdelivr.net/gh/samuelstefan01/ai-tech-blog@main/data/articles_fallback.json";
+
+// Cache of full articles list (for offline detail view + client-side search/filter)
+const ARTICLES_ALL_CACHE_KEY = "articles_all_cache_v1";
+const ARTICLES_ALL_CACHE_TIME_KEY = "articles_all_cache_time_v1";
+const ARTICLES_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+
+function readAllArticlesCache() {
+  try {
+    const t = Number(localStorage.getItem(ARTICLES_ALL_CACHE_TIME_KEY) || "0");
+    if (!t || (Date.now() - t) > ARTICLES_CACHE_TTL_MS) return null;
+    const raw = localStorage.getItem(ARTICLES_ALL_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeAllArticlesCache(articlesArray) {
+  try {
+    localStorage.setItem(ARTICLES_ALL_CACHE_KEY, JSON.stringify(articlesArray));
+    localStorage.setItem(ARTICLES_ALL_CACHE_TIME_KEY, String(Date.now()));
+  } catch (_) {}
+}
+
+async function tryFetchJson(url) {
+  const { res, text } = await fetchTextWithTimeout(url, API_TIMEOUT_MS);
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`);
+    err.status = res.status;
+    err.body = text;
+    throw err;
+  }
+  return JSON.parse(text);
+}
+
+function shapePage(allArticles, pageSize, offset) {
+  const total = Array.isArray(allArticles) ? allArticles.length : 0;
+  const slice = (allArticles || []).slice(offset, offset + pageSize);
+  return { articles: slice, meta: { totalCount: total, offset } };
+}
+
+async function loadArticlesWithFallback(pageSize, offset) {
+  // Source order: cache -> WT page -> backup full -> local full
+  // 1) Cached full list
+  const cachedAll = readAllArticlesCache();
+  if (cachedAll && cachedAll.length) {
+    return { data: shapePage(cachedAll, pageSize, offset), source: "cache" };
+  }
+
+  // 2) WT page (if not in cooldown)
+  const cooldownUntil = Number(localStorage.getItem(API_COOLDOWN_KEY) || "0");
+  if (Date.now() >= cooldownUntil) {
+    try {
+      const url = `${BASE_URL}/article?max=${pageSize}&offset=${offset}`;
+      const { res, text } = await fetchTextWithTimeout(url, API_TIMEOUT_MS);
+      if (res.ok) {
+        const parsed = JSON.parse(text);
+        // also refresh cache of the full list if this is the first page and meta.totalCount is reasonable
+        // (WT doesn't offer "all" in one call reliably, so we cache just what we have if needed)
+        return { data: parsed, source: "wt" };
+      }
+      throw new Error(`HTTP ${res.status}`);
+    } catch (_) {
+      setCooldownAfterFailure();
+    }
+  }
+
+  // 3) Backup JSON (expects full list {articles:[...]} or array)
+  if (BACKUP_JSON_URL) {
+    try {
+      const backup = await tryFetchJson(BACKUP_JSON_URL);
+      const arr = Array.isArray(backup) ? backup : (backup.articles || []);
+      if (Array.isArray(arr) && arr.length) {
+        writeAllArticlesCache(arr);
+        return { data: shapePage(arr, pageSize, offset), source: "backup" };
+      }
+    } catch (_) {}
+  }
+
+  // 4) Local fallback JSON (full list)
+  const local = await tryFetchJson(FALLBACK_JSON_URL);
+  const arr = Array.isArray(local) ? local : (local.articles || []);
+  if (Array.isArray(arr) && arr.length) {
+    writeAllArticlesCache(arr);
+    return { data: shapePage(arr, pageSize, offset), source: "local" };
+  }
+
+  return { data: { articles: [], meta: { totalCount: 0, offset } }, source: "empty" };
+}
+
+function bannerForSource(source) {
+  if (source === "wt") return null;
+  if (source === "cache") return "WT server is unavailable — showing cached articles.";
+  if (source === "backup") return "WT server is unavailable — showing articles from a backup source.";
+  if (source === "local") return "WT server is unavailable — showing offline demo articles.";
+  if (source === "empty") return "No articles available.";
+  return null;
+}
 
 async function loadFallbackResponseText(pageSize, offset) {
   const res = await fetch(FALLBACK_JSON_URL, { cache: "no-store" });
@@ -200,12 +305,10 @@ function fetchAndDisplayArticles(targetElm, params) {
 
   if (!target || !listTpl || !errorTpl) return;
 
-  const pageSize = 10; // smaller page → fewer 504s
+  const pageSize = 10;
   const offset = params && params.offset ? Number(params.offset) || 0 : 0;
-  const url = `${BASE_URL}/article?max=${pageSize}&offset=${offset}`;
 
   const onRetry = () => {
-    // clear cooldown so retry actually retries
     localStorage.removeItem(API_COOLDOWN_KEY);
     fetchAndDisplayArticles(targetElm, params);
   };
@@ -213,83 +316,53 @@ function fetchAndDisplayArticles(targetElm, params) {
   (async () => {
     setArticlesState(target, "loading");
 
-    // If upstream is in cooldown, don't even try the API — use cache/fallback.
-    const cooldownUntil = Number(localStorage.getItem(API_COOLDOWN_KEY) || "0");
-    if (Date.now() < cooldownUntil) {
-      // skip WT immediately, go fallback
-      const fallbackText = await loadFallbackArticles(offset);
-      setArticlesState(target, "error_cached");
-      handleArticlesSuccess(fallbackText, listTpl, target, offset, pageSize);
-      return;
-    }
-
-    // Try API up to 3 times (2 retries) with backoff.
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // GitHub Pages: WT is CORS-blocked. Skip WT entirely and fall back immediately.
+    if (IS_GH_PAGES) {
       try {
-        const { res, text } = await fetchTextWithTimeout(url, API_TIMEOUT_MS);
-
-        if (!res.ok) {
-          const err = new Error(`HTTP ${res.status}`);
-          err.status = res.status;
-          err.body = text;
-          throw err;
+        const cached = localStorage.getItem(ARTICLES_CACHE_KEY + `:${offset}`);
+        if (cached) {
+          const { text } = JSON.parse(cached);
+          setArticlesState(target, "error_cached");
+          handleArticlesSuccess(text, listTpl, target, offset, pageSize);
+          return;
         }
+      } catch (_) {}
 
-        handleArticlesSuccess(text, listTpl, target, offset, pageSize);
-        clearCooldownOnSuccess();
-
-        // cache last good response (per offset)
-        try {
-          localStorage.setItem(API_COOLDOWN_KEY, String(Date.now() + 2 * 60 * 1000)); // 2 minutes
-        } catch (_) {}
-
-        return;
-      } catch (e) {
-        // IMPORTANT: if AbortController cancelled it, it's a timeout on OUR side.
-        // Either way, treat it as failure.
-        setCooldownAfterFailure();
-
-        if (location.hostname === "localhost") {
-          console.error("Articles fetch failed:", e.name, e.message, e.status, e.body);
-        }
-
-        if (attempt < 2) await sleep(700 * (attempt + 1)); // backoff
-      }
-    }
-
-    // fallback to cache
-    try {
-      const cached = localStorage.getItem(ARTICLES_CACHE_KEY + `:${offset}`);
-      if (cached) {
-        const { text } = JSON.parse(cached);
+      try {
+        const text = await loadFallbackResponseText(pageSize, offset);
         setArticlesState(target, "error_cached");
         handleArticlesSuccess(text, listTpl, target, offset, pageSize);
         return;
+      } catch (_) {
+        target.innerHTML = Mustache.render(errorTpl.innerHTML, {});
+        document.getElementById("retry-load-articles")?.addEventListener("click", onRetry);
+        return;
       }
-    } catch (_) {}
+    }
 
-    // fallback to local JSON
     try {
-      const text = await loadFallbackResponseText(pageSize, offset);
-      setArticlesState(target, "error_cached");
-      handleArticlesSuccess(text, listTpl, target, offset, pageSize);
-      return;
-    } catch (_) {}
+      const { data, source } = await loadArticlesWithFallback(pageSize, offset);
 
-    // try fallback JSON (site must not look dead)
-    try {
-      const fallbackText = await loadFallbackArticles(offset);
-      setArticlesState(target, "error_cached"); // reuse the “API down” message
-      handleArticlesSuccess(fallbackText, listTpl, target, offset, pageSize);
-      return;
+      const banner = bannerForSource(source);
+      if (banner) {
+        // lightweight banner shown above the list
+        target.innerHTML = `<div class="status-banner" role="status">${banner}</div>`;
+      } else {
+        target.innerHTML = "";
+      }
+
+      handleArticlesSuccess(JSON.stringify(data), listTpl, target, offset, pageSize);
+
+      // if WT worked, clear cooldown
+      if (source === "wt") clearCooldownOnSuccess();
     } catch (e) {
       // final: render error
       target.innerHTML = Mustache.render(errorTpl.innerHTML, {});
       document.getElementById("retry-load-articles")?.addEventListener("click", onRetry);
+      if (location.hostname === "localhost") console.error("Articles render failed:", e);
     }
   })();
 }
-
 
 // ===== Article detail view (AJAX) =====
 
@@ -305,52 +378,134 @@ function fetchAndDisplayArticleDetail(targetElm, params) {
     return;
   }
 
-  const url = `${BASE_URL}/article/${encodeURIComponent(id)}`;
   const onRetry = () => fetchAndDisplayArticleDetail(targetElm, params);
 
   (async () => {
     target.innerHTML = "<p>Loading article…</p>";
 
-    try {
-      const { res, text } = await fetchTextWithTimeout(url, API_TIMEOUT_MS);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    // 1) Try WT detail first (if not in cooldown)
+    const cooldownUntil = Number(localStorage.getItem(API_COOLDOWN_KEY) || "0");
+    if (Date.now() >= cooldownUntil) {
+      try {
+        const url = `${BASE_URL}/article/${encodeURIComponent(id)}`;
+        const { res, text } = await fetchTextWithTimeout(url, API_TIMEOUT_MS);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = JSON.parse(text);
 
-      const data = JSON.parse(text);
+        const viewData = {
+          id: data.id,
+          title: data.title,
+          author: data.author || "unknown",
+          dateCreated: data.dateCreated ? data.dateCreated.substring(0, 10) : "",
+          content: data.content || "",
+          backOffset,
+          comments: []
+        };
+
+        // load comments (best-effort)
+        try {
+          const commentsUrl = `${BASE_URL}/article/${encodeURIComponent(id)}/comment`;
+          const { res: rc, text: tc } = await fetchTextWithTimeout(commentsUrl, API_TIMEOUT_MS);
+          if (rc.ok) viewData.comments = JSON.parse(tc) || [];
+        } catch (_) {
+          viewData.comments = [];
+        }
+
+        target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
+        initCommentForm(id, backOffset);
+        clearCooldownOnSuccess();
+        return;
+      } catch (e) {
+        setCooldownAfterFailure();
+        if (location.hostname === "localhost") console.error("WT article detail failed:", e);
+      }
+    }
+
+    // 2) Offline detail: search in cached/backup/local list
+    try {
+      let all = readAllArticlesCache();
+
+      if (!all || !all.length) {
+        // load local fallback list to satisfy detail view
+        const local = await tryFetchJson(FALLBACK_JSON_URL);
+        all = Array.isArray(local) ? local : (local.articles || []);
+        if (Array.isArray(all) && all.length) writeAllArticlesCache(all);
+      }
+
+      const found = (all || []).find(a => String(a.id) === String(id));
+      if (!found) throw new Error("Article not found in offline store");
 
       const viewData = {
-        id: data.id,
-        title: data.title,
-        author: data.author || "unknown",
-        dateCreated: data.dateCreated ? data.dateCreated.substring(0, 10) : "",
-        content: data.content || "",
+        id: found.id,
+        title: found.title,
+        author: found.author || "unknown",
+        dateCreated: found.dateCreated ? String(found.dateCreated).substring(0, 10) : "",
+        content: found.content || "",
         backOffset,
         comments: []
       };
 
-      // load comments (best-effort)
-      try {
-        const commentsUrl = `${BASE_URL}/article/${encodeURIComponent(id)}/comment`;
-        const { res: rc, text: tc } = await fetchTextWithTimeout(commentsUrl, API_TIMEOUT_MS);
-        if (rc.ok) {
-          viewData.comments = JSON.parse(tc) || [];
-        }
-      } catch (_) {
-        viewData.comments = [];
-      }
+      // Offline comments (stored locally if WT is down)
+      viewData.comments = loadLocalComments(id);
 
       target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
       initCommentForm(id, backOffset);
     } catch (e) {
+      // Offline fallback: try local seed
+      try {
+        const all = await (async () => { const r = await fetch(FALLBACK_JSON_URL, { cache: "no-store" }); if (!r.ok) throw 0; const j = await r.json(); return Array.isArray(j) ? j : (j.articles || []); })();
+        const found = (all || []).find(a => String(a.id) === String(id));
+        if (found) {
+          const viewData = {
+            id: found.id,
+            title: found.title,
+            author: found.author || "unknown",
+            dateCreated: found.dateCreated ? String(found.dateCreated).substring(0,10) : "",
+            content: found.content || "",
+            backOffset,
+            comments: loadLocalComments(id)
+          };
+          target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
+          initCommentForm(id, backOffset, true);
+          return;
+        }
+      } catch (_) {}
+
       target.innerHTML = `<p>Nepodarilo sa načítať článok.</p><button id="retry-article" type="button">Retry</button>`;
       document.getElementById("retry-article")?.addEventListener("click", onRetry);
-      if (location.hostname === "localhost") console.error("Article detail fetch failed:", e);
+      if (location.hostname === "localhost") console.error("Offline article detail failed:", e);
     }
   })();
 }
 
+
 // ===== Comment form handling =====
 
-function initCommentForm(articleId, backOffset) {
+
+const LOCAL_COMMENTS_KEY = "local_comments_v1";
+
+function loadLocalComments(articleId) {
+  try {
+    const raw = localStorage.getItem(LOCAL_COMMENTS_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    const arr = obj && obj[articleId] ? obj[articleId] : [];
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveLocalComment(articleId, comment) {
+  try {
+    const raw = localStorage.getItem(LOCAL_COMMENTS_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    const arr = Array.isArray(obj[articleId]) ? obj[articleId] : [];
+    arr.unshift(comment);
+    obj[articleId] = arr;
+    localStorage.setItem(LOCAL_COMMENTS_KEY, JSON.stringify(obj));
+  } catch (_) {}
+}
+function initCommentForm(articleId, backOffset, offlineOnly = false) {
   const btn = document.getElementById("add-comment-btn");
   const container = document.getElementById("comment-form-container");
   if (!btn || !container) return;
@@ -386,16 +541,27 @@ function initCommentForm(articleId, backOffset) {
       }
 
       const xhr = new XMLHttpRequest();
+      if (offlineOnly) {
+        saveLocalComment(articleId, { author, text, dateCreated: new Date().toISOString(), local: true });
+        window.location.hash = `#article?id=${articleId}&offset=${backOffset}`;
+        return;
+      }
+
       xhr.open("POST", `${BASE_URL}/article/${encodeURIComponent(articleId)}/comment`, true);
       xhr.setRequestHeader("Content-Type", "application/json");
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           window.location.hash = `#article?id=${articleId}&offset=${backOffset}`;
         } else {
-          alert("Komentár sa nepodarilo uložiť.");
+          // WT server down: save comment locally so UX still works
+          saveLocalComment(articleId, { author, text, dateCreated: new Date().toISOString(), local: true, likes: 0 });
+          window.location.hash = `#article?id=${articleId}&offset=${backOffset}`;
         }
       };
-      xhr.onerror = () => alert("Chyba siete pri ukladaní komentára.");
+      xhr.onerror = () => {
+        saveLocalComment(articleId, { author, text, dateCreated: new Date().toISOString(), local: true, likes: 0 });
+        window.location.hash = `#article?id=${articleId}&offset=${backOffset}`;
+      };
       xhr.send(JSON.stringify({ author, text }));
     });
   });

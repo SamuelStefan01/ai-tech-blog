@@ -8,7 +8,7 @@ const IS_NETLIFY = location.hostname.includes("netlify");          // covers net
 const IS_GH_PAGES = location.hostname.endsWith("github.io");
 
 // On Netlify we call our proxy (/api/* -> /.netlify/functions/wtProxy/*).
-// On GitHub Pages we DO NOT call WT at all (CORS will block), so we go straight to backup/local.
+// On GitHub Pages / localhost we try WT first; if it fails (CORS/down), we fall back to local/backup.
 const BASE_URL = IS_NETLIFY ? "/api" : WT_BASE_URL;
 
 
@@ -124,7 +124,7 @@ async function loadFallbackResponseText(pageSize, offset) {
   const arr = Array.isArray(all) ? all : (all.articles || []);
   const total = Array.isArray(arr) ? arr.length : 0;
   const slice = (arr || []).slice(offset, offset + pageSize);
-  const shaped = {  __source: "fallback", articles: slice, meta: { totalCount: total, offset }};
+  const shaped = { __source: "fallback", articles: slice, meta: { totalCount: total, offset } };
   return JSON.stringify(shaped);
 }
 
@@ -239,14 +239,6 @@ function fetchAndDisplayArticles(targetElm, params) {
   (async () => {
     setArticlesState(target, "loading");
 
-    // GitHub Pages: skip WT completely (CORS) and go straight to fallback.
-    if (IS_GH_PAGES) {
-      const text = await loadFallbackResponseText(pageSize, offset);
-      setArticlesState(target, "offline_banner");
-      handleArticlesSuccess(text, listTpl, target, offset, pageSize);
-      return;
-    }
-
     // Netlify/others: try API unless in cooldown
     const cooldownUntil = Number(localStorage.getItem(API_COOLDOWN_KEY) || "0");
     const canTryApi = Date.now() >= cooldownUntil;
@@ -316,27 +308,6 @@ function fetchAndDisplayArticleDetail(targetElm, params) {
   const id = params && params.id;
   const backOffset = params && params.offset ? Number(params.offset) || 0 : 0;
   if (!id) { target.innerHTML = "<p>Chýba article ID.</p>"; return; }
-
-  // GH Pages: serve detail from fallback store (no WT)
-  if (IS_GH_PAGES) {
-    (async () => {
-      const all = await fetchFallbackObject();
-      const arr = Array.isArray(all) ? all : (all.articles || []);
-      const found = (arr || []).find(a => String(a.id) === String(id));
-      if (!found) { target.innerHTML = "<p>Článok neexistuje (offline).</p>"; return; }
-      const viewData = {
-        id: found.id,
-        title: found.title,
-        author: found.author || "unknown",
-        dateCreated: (found.dateCreated || "").toString().substring(0, 10),
-        content: found.content || "",
-        backOffset,
-        comments: []
-      };
-      target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
-    })();
-    return;
-  }
 
   const url = `${BASE_URL}/article/${encodeURIComponent(id)}`;
   const onRetry = () => fetchAndDisplayArticleDetail(targetElm, params);
@@ -446,72 +417,90 @@ function initCommentForm(articleId, backOffset) {
 // ===== Render helper =====
 function handleArticlesSuccess(responseText, listTpl, target, offset, pageSize) {
   let data;
-  try { data = JSON.parse(responseText); } catch (_) { target.innerHTML = "<p>Chybná odpoveď servera.</p>"; return; }
+  try {
+    data = JSON.parse(responseText);
+  } catch (_) {
+    target.innerHTML = "<p>Chybná odpoveď servera.</p>";
+    return;
+  }
 
-  const articles = Array.isArray(data.articles) ? data.articles : [];
+  const allArticles = Array.isArray(data.articles) ? data.articles : [];
   const meta = data.meta || {};
-  const totalCount = typeof meta.totalCount === "number" ? meta.totalCount : articles.length;
+  const totalCount = typeof meta.totalCount === "number" ? meta.totalCount : allArticles.length;
 
   const hasPrev = offset > 0;
   const hasNext = offset + pageSize < totalCount;
+  const prevOffset = hasPrev ? Math.max(0, offset - pageSize) : null;
+  const nextOffset = hasNext ? offset + pageSize : null;
 
-  const viewData = {
-    title: data.__source === "fallback"
+  const title =
+    data.__source === "fallback"
       ? "Offline články z lokálnej knižnice"
-      : "Články z WT servera",
+      : "Články z WT servera";
 
-    articles: articles.map(a => ({
+  function mapArticles(arr) {
+    return (arr || []).map(a => ({
       id: a.id,
       title: a.title,
       author: a.author || "unknown",
       dateCreated: a.dateCreated ? String(a.dateCreated).substring(0, 10) : "",
       contentShort: a.content
-        ? String(a.content).replace(/<[^>]*>/g, "").substring(0, 160) + "..."
+        ? String(a.content)
+            .replace(/<[^>]*>/g, "")
+            .replace(/\s+/g, " ")
+            .trim()
+            .substring(0, 160) + "..."
         : ""
-    })),
+    }));
+  }
 
-    paging: {
-      prev: hasPrev,
-      next: hasNext,
-      prevOffset,
-      nextOffset
-    }
-  };
+  function render(query, caretPos) {
+    const q = (query || "").toLowerCase().trim();
 
-  setTimeout(() => {
-  const input = document.getElementById("article-search");
-  if (!input) return;
+    const filtered = !q
+      ? allArticles
+      : allArticles.filter(a =>
+          (a.title || "").toLowerCase().includes(q) ||
+          (a.author || "").toLowerCase().includes(q) ||
+          (a.content || "").toLowerCase().includes(q)
+        );
 
-  input.addEventListener("input", (e) => {
-    const q = e.target.value.toLowerCase().trim();
-
-    const filtered = articles.filter(a => {
-      return (
-        (a.title || "").toLowerCase().includes(q) ||
-        (a.author || "").toLowerCase().includes(q) ||
-        (a.content || "").toLowerCase().includes(q)
-      );
-    });
-
-    const filteredView = {
-      ...viewData,
-      articles: filtered.map(a => ({
-        id: a.id,
-        title: a.title,
-        author: a.author || "unknown",
-        dateCreated: a.dateCreated
-          ? String(a.dateCreated).substring(0, 10)
-          : "",
-        contentShort: a.content
-          ? String(a.content).replace(/<[^>]*>/g, "").substring(0, 160) + "..."
-          : ""
-      })),
-      paging: null // hide pagination during search
+    const viewData = {
+      title,
+      articles: mapArticles(filtered),
+      paging: q ? null : ((hasPrev || hasNext) ? {
+        prev: hasPrev,
+        next: hasNext,
+        prevOffset,
+        nextOffset
+      } : null)
     };
 
-    target.innerHTML = Mustache.render(listTpl.innerHTML, filteredView);
-  });
-}, 0);
+    target.innerHTML = Mustache.render(listTpl.innerHTML, viewData);
 
-  target.innerHTML = Mustache.render(listTpl.innerHTML, viewData);
+    const input = document.getElementById("article-search");
+    if (!input) return;
+
+    input.value = query || "";
+
+    // Restore focus + caret so user can type continuously.
+    input.focus();
+    const pos = (typeof caretPos === "number") ? caretPos : input.value.length;
+    try { input.setSelectionRange(pos, pos); } catch (_) {}
+
+    input.oninput = (e) => {
+      const v = e.target.value;
+      const c = (typeof e.target.selectionStart === "number") ? e.target.selectionStart : v.length;
+      render(v, c);
+    };
+
+    input.onkeydown = (e) => {
+      if (e.key === "Escape") {
+        input.value = "";
+        render("", 0);
+      }
+    };
+  }
+
+  render("", 0);
 }

@@ -9,3 +9,11 @@ import "./themeToggle.js"
 const router = new ParamHashRouter(routes);
 
 export default router;
+
+try {
+  // your existing router init
+} catch (e) {
+  console.error(e);
+  const rv = document.getElementById("router-view");
+  if (rv) rv.innerHTML = "<p>App failed to start. Check console.</p>";
+}

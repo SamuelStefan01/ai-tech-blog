@@ -1,5 +1,18 @@
 // Handles Google Sign-In and keeps current user in window.currentUser + localStorage
 
+// Disable Google Sign-In on localhost/dev to avoid breaking the app
+const isLocal = location.hostname === "127.0.0.1" || location.hostname === "localhost";
+if (isLocal) {
+  console.warn("Google Sign-In disabled on localhost.");
+} else {
+  // wrap your existing init code in try/catch
+  try {
+    // ... your existing google init code here ...
+  } catch (e) {
+    console.warn("Google Sign-In failed, continuing without it:", e);
+  }
+}
+
 // Decode JWT payload using proper UTF-8 handling
 function decodeJwtPayload(token) {
   const base64Url = token.split(".")[1];

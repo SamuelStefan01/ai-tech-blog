@@ -273,19 +273,27 @@
     <!-- ========== ARTICLES FROM WT SERVER ========== -->
     <script id="template-articles" type="text/template">
       <section id="articles">
-        <h2 id="articles-title">{{title}}</h2>
+        <h2>{{title}}</h2>
 
         <div class="articles-search">
-          <input
-            type="text"
-            id="article-search"
-            placeholder="Vyhľadať články (AI, ML, RAG...)"
-            autocomplete="off"
-          />
+          <div class="search-wrap">
+            <svg class="search-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="2" fill="none"/><line x1="16" y1="16" x2="21" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+
+            <input
+              type="text"
+              id="article-search"
+              placeholder="Hľadať v článkoch (AI, ML, RAG...)"
+              autocomplete="off"
+            />
+
+            <button type="button" class="search-clear" id="article-search-clear" aria-label="Clear search">×</button>
+          </div>
         </div>
 
         {{#articles.length}}
-        <ul class="articles" aria-label="Zoznam článkov z WT servera">
+        <ul class="articles" aria-label="Zoznam článkov">
           {{#articles}}
           <li class="article-card">
             <a class="article-link" href="#article?id={{id}}">

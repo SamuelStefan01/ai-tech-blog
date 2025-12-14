@@ -6,13 +6,13 @@ const WT_BASE_URL = "https://wt.kpi.fei.tuke.sk/api";
 const PROXY_BASE_URL = "/api";
 const isNetlify = location.hostname.endsWith(".netlify.app");
 const isNetlifyDev = location.hostname === "localhost" && (location.port === "8888" || location.port === "9999");
-const BASE_URL = (isNetlify || isNetlifyDev) ? PROXY_BASE_URL : WT_BASE_URL;
+const BASE_URL = (location.hostname.includes("netlify.app") ? "/api" : "https://wt.kpi.fei.tuke.sk/api");
 const articleFormsHandler = new ArticleFormsHandler(BASE_URL);
 const API_COOLDOWN_KEY = "wt_api_cooldown_until";
 
 // ===== Resilient fetch helpers (timeout + retry + cache) =====
 const ARTICLES_CACHE_KEY = "articles_cache_v1";
-const API_TIMEOUT_MS = 65000; // 65s client timeout
+const API_TIMEOUT_MS = 5000; // 5s client timeout
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));

@@ -124,7 +124,7 @@ async function loadFallbackResponseText(pageSize, offset) {
   const arr = Array.isArray(all) ? all : (all.articles || []);
   const total = Array.isArray(arr) ? arr.length : 0;
   const slice = (arr || []).slice(offset, offset + pageSize);
-  const shaped = { articles: slice, meta: { totalCount: total, offset } };
+  const shaped = {  __source: "fallback", articles: slice, meta: { totalCount: total, offset }};
   return JSON.stringify(shaped);
 }
 
@@ -456,20 +456,62 @@ function handleArticlesSuccess(responseText, listTpl, target, offset, pageSize) 
   const hasNext = offset + pageSize < totalCount;
 
   const viewData = {
+    title: data.__source === "fallback"
+      ? "Offline články z lokálnej knižnice"
+      : "Články z WT servera",
+
     articles: articles.map(a => ({
       id: a.id,
       title: a.title,
       author: a.author || "unknown",
       dateCreated: a.dateCreated ? String(a.dateCreated).substring(0, 10) : "",
-      contentShort: a.content ? String(a.content).replace(/<[^>]*>/g, "").substring(0, 160) + "..." : ""
+      contentShort: a.content
+        ? String(a.content).replace(/<[^>]*>/g, "").substring(0, 160) + "..."
+        : ""
     })),
+
     paging: {
       prev: hasPrev,
       next: hasNext,
-      prevOffset: hasPrev ? Math.max(0, offset - pageSize) : null,
-      nextOffset: hasNext ? offset + pageSize : null
+      prevOffset,
+      nextOffset
     }
   };
+
+  setTimeout(() => {
+  const input = document.getElementById("article-search");
+  if (!input) return;
+
+  input.addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase().trim();
+
+    const filtered = articles.filter(a => {
+      return (
+        (a.title || "").toLowerCase().includes(q) ||
+        (a.author || "").toLowerCase().includes(q) ||
+        (a.content || "").toLowerCase().includes(q)
+      );
+    });
+
+    const filteredView = {
+      ...viewData,
+      articles: filtered.map(a => ({
+        id: a.id,
+        title: a.title,
+        author: a.author || "unknown",
+        dateCreated: a.dateCreated
+          ? String(a.dateCreated).substring(0, 10)
+          : "",
+        contentShort: a.content
+          ? String(a.content).replace(/<[^>]*>/g, "").substring(0, 160) + "..."
+          : ""
+      })),
+      paging: null // hide pagination during search
+    };
+
+    target.innerHTML = Mustache.render(listTpl.innerHTML, filteredView);
+  });
+}, 0);
 
   target.innerHTML = Mustache.render(listTpl.innerHTML, viewData);
 }

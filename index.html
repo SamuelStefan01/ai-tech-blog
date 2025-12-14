@@ -273,7 +273,16 @@
     <!-- ========== ARTICLES FROM WT SERVER ========== -->
     <script id="template-articles" type="text/template">
       <section id="articles">
-        <h2>Články z WT servera</h2>
+        <h2 id="articles-title">{{title}}</h2>
+
+        <div class="articles-search">
+          <input
+            type="text"
+            id="article-search"
+            placeholder="Vyhľadať články (AI, ML, RAG...)"
+            autocomplete="off"
+          />
+        </div>
 
         {{#articles.length}}
         <ul class="articles" aria-label="Zoznam článkov z WT servera">

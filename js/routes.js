@@ -58,12 +58,12 @@ async function fetchTextWithTimeout(url, ms = API_TIMEOUT_MS) {
 // =====================
 const FALLBACK_JSON_URL = absFromAppBase("data/articles_fallback.json");
 const BACKUP_SOURCES = [
-  "https://cdn.jsdelivr.net/gh/samuelstefan01/ai-tech-blog@main/data/articles_fallback.json",
-  "https://raw.githubusercontent.com/samuelstefan01/ai-tech-blog/main/data/articles_fallback.json"
+  "https://cdn.jsdelivr.net/gh/samuelstefan01/ai-tech-blog@main/data/articles_fallback.json?v=20251214",
+  "https://raw.githubusercontent.com/samuelstefan01/ai-tech-blog/main/data/articles_fallback.json?v=20251214"
 ];
 
 // Cache LAST GOOD PAGE response (per offset) so refresh works even offline
-const ARTICLES_CACHE_KEY = "articles_cache_v1";
+const ARTICLES_CACHE_KEY = "articles_cache_v2";
 
 function setArticlesState(target, state, extra = {}) {
   if (!target) return;
@@ -101,15 +101,22 @@ async function fetchJsonWithTimeout(url, ms = 3500) {
 }
 
 async function fetchFallbackObject() {
-  // 1) Try backup sources (CDN/raw)
+  // IMPORTANT:
+  // - Prefer SAME-ORIGIN fallback first (GH Pages / static hosting).
+  // - Only use CDN/raw backups if the local file is missing/unreachable.
+  try {
+    return await fetchJsonWithTimeout(FALLBACK_JSON_URL, 3500);
+  } catch (_) {
+    // continue to backups
+  }
+
   for (const url of BACKUP_SOURCES) {
     try {
-      const j = await fetchJsonWithTimeout(url, 3500);
-      return j;
+      return await fetchJsonWithTimeout(url, 3500);
     } catch (_) {}
   }
-  // 2) Local bundled JSON
-  return await fetchJsonWithTimeout(FALLBACK_JSON_URL, 3500);
+
+  throw new Error("No fallback source available");
 }
 
 async function loadFallbackResponseText(pageSize, offset) {

@@ -1,12 +1,4 @@
-/**
- * Netlify Function: wtProxy
- * Proxies requests to WT API to bypass browser CORS.
- *
- * Frontend calls: /api/<path>?query
- * Netlify redirects to: /.netlify/functions/wtProxy/<path>?query
- */
 export async function handler(event) {
-  // CORS preflight
   if (event.httpMethod === "OPTIONS") {
     return {
       statusCode: 204,
@@ -22,40 +14,33 @@ export async function handler(event) {
 
   const WT_BASE = "https://wt.kpi.fei.tuke.sk/api";
 
-  // event.path looks like "/.netlify/functions/wtProxy/article" or "/.netlify/functions/wtProxy"
-  const marker = "/.netlify/functions/wtProxy";
-  let rest = event.path.includes(marker) ? event.path.split(marker)[1] : "";
+  // event.path e.g. "/.netlify/functions/wtProxy/article"
+  const prefix = "/.netlify/functions/wtProxy";
+  let rest = event.path.startsWith(prefix) ? event.path.slice(prefix.length) : "";
   if (!rest) rest = "/";
   if (!rest.startsWith("/")) rest = "/" + rest;
 
-  const qs = event.rawQueryString ? ("?" + event.rawQueryString) : "";
-  const targetUrl = WT_BASE + rest + qs;
+  const qs = event.rawQueryString ? `?${event.rawQueryString}` : "";
+  const targetUrl = `${WT_BASE}${rest}${qs}`;
 
   try {
     const upstream = await fetch(targetUrl, {
       method: event.httpMethod,
-      headers: {
-        // Forward only safe headers
-        "Content-Type": event.headers?.["content-type"] || "application/json",
-        "Accept": "application/json"
-      },
+      headers: { "Accept": "application/json", "Content-Type": "application/json" },
       body: ["GET", "HEAD"].includes(event.httpMethod) ? undefined : event.body
     });
 
     const bodyText = await upstream.text();
-    const contentType = upstream.headers.get("content-type") || "application/json";
-
     return {
       statusCode: upstream.status,
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Content-Type": contentType,
+        "Content-Type": upstream.headers.get("content-type") || "application/json",
         "Cache-Control": "no-store"
       },
       body: bodyText
     };
   } catch (err) {
-    // Return a JSON error the frontend can handle
     return {
       statusCode: 502,
       headers: {
@@ -63,11 +48,7 @@ export async function handler(event) {
         "Content-Type": "application/json",
         "Cache-Control": "no-store"
       },
-      body: JSON.stringify({
-        error: "WT proxy failed",
-        targetUrl,
-        details: String(err)
-      })
+      body: JSON.stringify({ error: "WT proxy failed", targetUrl, details: String(err) })
     };
   }
 }

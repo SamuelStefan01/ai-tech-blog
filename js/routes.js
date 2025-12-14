@@ -11,6 +11,12 @@ const IS_GH_PAGES = location.hostname.endsWith("github.io");
 // On GitHub Pages / localhost we try WT first; if it fails (CORS/down), we fall back to local/backup.
 const BASE_URL = IS_NETLIFY ? "/api" : WT_BASE_URL;
 
+// =====================
+// AWT11 supplementary: show only "our" articles
+// =====================
+// Pick a tag that is unique to your project. This tag is NOT shown in UI/forms.
+const MY_TAG = "boss_ai_tech_2025";
+
 
 // Base path that works on GitHub Pages subpaths even if <base href="/"> is present.
 const APP_BASE = (() => {
@@ -41,6 +47,26 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+// Simple Promise-based XHR (required by AWT11 task 4)
+function xhrGetJson(url, timeoutMs = API_TIMEOUT_MS) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("GET", url, true);
+    xhr.timeout = timeoutMs;
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try { resolve(JSON.parse(xhr.responseText)); }
+        catch (e) { reject(new Error("Invalid JSON")); }
+      } else {
+        reject(new Error(`HTTP ${xhr.status}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error("Network error"));
+    xhr.ontimeout = () => reject(new Error("Timeout"));
+    xhr.send();
+  });
+}
+
 async function fetchTextWithTimeout(url, ms = API_TIMEOUT_MS) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
@@ -64,6 +90,17 @@ const BACKUP_SOURCES = [
 
 // Cache LAST GOOD PAGE response (per offset) so refresh works even offline
 const ARTICLES_CACHE_KEY = "articles_cache_v2";
+
+// Local-only articles (UX fallback for testing when WT server blocks CORS on 127.0.0.1)
+const LOCAL_ARTICLES_KEY = "local_articles_v1";
+function getLocalArticles() {
+  try {
+    const arr = JSON.parse(localStorage.getItem(LOCAL_ARTICLES_KEY) || "[]");
+    return Array.isArray(arr) ? arr : [];
+  } catch (_) {
+    return [];
+  }
+}
 
 function setArticlesState(target, state, extra = {}) {
   if (!target) return;
@@ -244,7 +281,8 @@ function fetchAndDisplayArticles(targetElm, params) {
     const canTryApi = Date.now() >= cooldownUntil;
 
     if (canTryApi) {
-      const url = `${BASE_URL}/article?max=${pageSize}&offset=${offset}`;
+      // Show only our articles (AWT11 supplementary #2: tag filter)
+      const url = `${BASE_URL}/article?tag=${encodeURIComponent(MY_TAG)}&max=${pageSize}&offset=${offset}`;
 
       // Try once + one retry (fast)
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -256,13 +294,28 @@ function fetchAndDisplayArticles(targetElm, params) {
           const parsed = JSON.parse(text);
           if (!parsed || !Array.isArray(parsed.articles)) throw new Error("Non-article JSON");
 
+          // AWT11 task 4: list response may miss article bodies (content).
+          // Enrich each article using AJAX XMLHttpRequest (detail endpoint).
+          const enrichedArticles = await Promise.all(parsed.articles.map(async (a) => {
+            // If content is already present, keep it.
+            if (a && typeof a.content === "string" && a.content.trim()) return a;
+            try {
+              const detail = await xhrGetJson(`${BASE_URL}/article/${encodeURIComponent(a.id)}`);
+              return { ...a, content: detail.content || "" };
+            } catch (_) {
+              return { ...a, content: "" };
+            }
+          }));
+          parsed.articles = enrichedArticles;
+          const enrichedText = JSON.stringify(parsed);
+
           // Cache this page response
           try {
-            localStorage.setItem(`${ARTICLES_CACHE_KEY}:${offset}`, JSON.stringify({ text, t: Date.now() }));
+            localStorage.setItem(`${ARTICLES_CACHE_KEY}:${offset}`, JSON.stringify({ text: enrichedText, t: Date.now() }));
           } catch (_) {}
 
           clearCooldownOnSuccess();
-          handleArticlesSuccess(text, listTpl, target, offset, pageSize);
+          handleArticlesSuccess(enrichedText, listTpl, target, offset, pageSize);
           return;
         } catch (e) {
           setCooldownAfterFailure();
@@ -307,6 +360,48 @@ function fetchAndDisplayArticleDetail(targetElm, params) {
 
   const id = params && params.id;
   const backOffset = params && params.offset ? Number(params.offset) || 0 : 0;
+  const cOffset = params && params.cOffset ? Number(params.cOffset) || 0 : 0;
+  const commentsPageSize = 10;
+
+  // Local comment storage helpers (for local-* articles)
+  const getLocalComments = (articleId) => {
+    try {
+      return JSON.parse(localStorage.getItem(`local_comments_v1_${articleId}`) || "[]") || [];
+    } catch (_) {
+      return [];
+    }
+  };
+
+  // Local-only article support (UX fallback for testing when WT server is blocked).
+  if (typeof id === "string" && id.startsWith("local-")) {
+    const locals = getLocalArticles();
+    const found = locals.find(a => String(a.id) === String(id));
+    if (found) {
+      const allComments = getLocalComments(found.id);
+      const pageComments = allComments.slice(cOffset, cOffset + commentsPageSize);
+      const hasPrev = cOffset > 0;
+      const hasNext = cOffset + commentsPageSize < allComments.length;
+      const viewData = {
+        id: found.id,
+        title: found.title,
+        author: found.author || "unknown",
+        dateCreated: (found.dateCreated || "").toString().substring(0, 10),
+        content: found.content || "",
+        backOffset,
+        comments: pageComments,
+        commentPaging: (hasPrev || hasNext) ? {
+          prev: hasPrev,
+          next: hasNext,
+          prevOffset: Math.max(0, cOffset - commentsPageSize),
+          nextOffset: cOffset + commentsPageSize,
+          cOffset
+        } : null
+      };
+      target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
+      initCommentForm(found.id, backOffset);
+      return;
+    }
+  }
   if (!id) { target.innerHTML = "<p>Chýba article ID.</p>"; return; }
 
   const url = `${BASE_URL}/article/${encodeURIComponent(id)}`;
@@ -328,14 +423,34 @@ function fetchAndDisplayArticleDetail(targetElm, params) {
         dateCreated: data.dateCreated ? String(data.dateCreated).substring(0, 10) : "",
         content: data.content || "",
         backOffset,
-        comments: []
+        comments: [],
+        commentPaging: null
       };
 
       // load comments (best-effort)
       try {
-        const commentsUrl = `${BASE_URL}/article/${encodeURIComponent(id)}/comment`;
-        const { res: rc, text: tc } = await fetchTextWithTimeout(commentsUrl, API_TIMEOUT_MS);
-        if (rc.ok) viewData.comments = JSON.parse(tc) || [];
+        const commentsUrl = `${BASE_URL}/article/${encodeURIComponent(id)}/comment?max=${commentsPageSize}&offset=${cOffset}`;
+        const cData = await xhrGetJson(commentsUrl, API_TIMEOUT_MS);
+
+        // WT API sometimes returns an array, sometimes an object with {comments, meta}
+        const commentsArr = Array.isArray(cData) ? cData : (cData.comments || []);
+        viewData.comments = (commentsArr || []).slice(0, commentsPageSize);
+
+        // Paging: best-effort (if meta missing, allow Next when we got a full page)
+        const total = (!Array.isArray(cData) && cData.meta && typeof cData.meta.totalCount === "number")
+          ? cData.meta.totalCount
+          : null;
+        const hasPrev = cOffset > 0;
+        const hasNext = total != null ? (cOffset + commentsPageSize < total) : (commentsArr.length === commentsPageSize);
+        if (hasPrev || hasNext) {
+          viewData.commentPaging = {
+            prev: hasPrev,
+            next: hasNext,
+            prevOffset: Math.max(0, cOffset - commentsPageSize),
+            nextOffset: cOffset + commentsPageSize,
+            cOffset
+          };
+        }
       } catch (_) {}
 
       target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
@@ -358,6 +473,9 @@ function fetchAndDisplayArticleDetail(targetElm, params) {
           comments: []
         };
         target.innerHTML = Mustache.render(tpl.innerHTML, viewData);
+        // Even in offline fallback mode we still want the Add Comment UX to work.
+        // (Posting to server may fail, but the form must appear.)
+        initCommentForm(found.id, backOffset);
         return;
       } catch (_) {}
 
@@ -373,7 +491,21 @@ function initCommentForm(articleId, backOffset) {
   const container = document.getElementById("comment-form-container");
   if (!btn || !container) return;
 
-  btn.addEventListener("click", () => {
+  // Persist context so delegated handlers (and debugging) always know
+  // which article we are working with.
+  btn.dataset.articleId = String(articleId);
+  btn.dataset.backOffset = String(backOffset ?? 0);
+
+  // IMPORTANT FIX:
+  // This route is re-rendered often; if we keep stacking listeners, weird things happen.
+  // Using direct assignment guarantees exactly one handler per render.
+  btn.onclick = () => {
+    // simple toggle: if form already visible, collapse it
+    if (container.querySelector("#comment-form")) {
+      container.innerHTML = "";
+      return;
+    }
+
     container.innerHTML = `
       <form id="comment-form">
         <div class="field">
@@ -389,8 +521,16 @@ function initCommentForm(articleId, backOffset) {
     `;
 
     const form = document.getElementById("comment-form");
+    if (!form) {
+      alert("Nepodarilo sa zobraziť formulár pre komentár.");
+      return;
+    }
     const user = window.currentUser;
     if (user) form.elements["author"].value = user.name;
+
+    // UX: focus first empty field
+    if (!form.elements["author"].value) form.elements["author"].focus();
+    else form.elements["text"].focus();
 
     form.addEventListener("submit", (e) => {
       e.preventDefault();
@@ -398,12 +538,27 @@ function initCommentForm(articleId, backOffset) {
       const text = form.elements["text"].value.trim();
       if (!author || !text) { alert("Vyplňte meno aj text komentára."); return; }
 
+      // Local-only articles: store comments locally so Add Comment works even when WT server is blocked.
+      if (String(articleId).startsWith("local-")) {
+        try {
+          const key = `local_comments_v1_${articleId}`;
+          const current = JSON.parse(localStorage.getItem(key) || "[]") || [];
+          current.unshift({ author, text, dateCreated: new Date().toISOString() });
+          localStorage.setItem(key, JSON.stringify(current));
+          window.location.hash = `#article?id=${articleId}&offset=${backOffset}&cOffset=0`;
+          return;
+        } catch (_) {
+          alert("Nepodarilo sa uložiť lokálny komentár.");
+          return;
+        }
+      }
+
       const xhr = new XMLHttpRequest();
       xhr.open("POST", `${BASE_URL}/article/${encodeURIComponent(articleId)}/comment`, true);
       xhr.setRequestHeader("Content-Type", "application/json");
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          window.location.hash = `#article?id=${articleId}&offset=${backOffset}`;
+          window.location.hash = `#article?id=${articleId}&offset=${backOffset}&cOffset=0`;
         } else {
           alert("Komentár sa nepodarilo uložiť.");
         }
@@ -411,7 +566,7 @@ function initCommentForm(articleId, backOffset) {
       xhr.onerror = () => alert("Chyba siete pri ukladaní komentára.");
       xhr.send(JSON.stringify({ author, text }));
     });
-  });
+  };
 }
 
 // ===== Render helper =====
@@ -424,7 +579,15 @@ function handleArticlesSuccess(responseText, listTpl, target, offset, pageSize) 
     return;
   }
 
-  const allArticles = Array.isArray(data.articles) ? data.articles : [];
+  let allArticles = Array.isArray(data.articles) ? data.articles : [];
+  // UX fallback: if user saved something locally (because server was blocked),
+  // show those items at the top so Add Article can be tested end-to-end.
+  const locals = getLocalArticles();
+  if (locals.length) {
+    const localIds = new Set(locals.map(a => String(a.id)));
+    const withoutDup = allArticles.filter(a => !localIds.has(String(a.id)));
+    allArticles = [...locals, ...withoutDup];
+  }
   const meta = data.meta || {};
   const totalCount = typeof meta.totalCount === "number" ? meta.totalCount : allArticles.length;
 
@@ -467,6 +630,7 @@ function handleArticlesSuccess(responseText, listTpl, target, offset, pageSize) 
 
     const viewData = {
       title,
+      listOffset: offset,
       articles: mapArticles(filtered),
       paging: q ? null : ((hasPrev || hasNext) ? {
         prev: hasPrev,
@@ -504,3 +668,106 @@ function handleArticlesSuccess(responseText, listTpl, target, offset, pageSize) 
 
   render("", 0);
 }
+
+// =====================
+// Robust delegated UX handlers
+// (prevents "button does nothing" if a re-render ever skips binding)
+// =====================
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest ? e.target.closest("#add-comment-btn") : null;
+  if (!btn) return;
+
+  // If initCommentForm already bound btn.onclick, let it handle the click.
+  if (typeof btn.onclick === "function") return;
+
+  const container = document.getElementById("comment-form-container");
+  if (!container) return;
+
+  // Pull context from data-* OR fall back to the current route params.
+  const parseHashParam = (k) => {
+    try {
+      const h = window.location.hash || "";
+      const q = h.includes("?") ? h.split("?").slice(1).join("?") : "";
+      const sp = new URLSearchParams(q);
+      return sp.get(k);
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const articleId = btn.dataset.articleId || parseHashParam("id");
+  const backOffset = btn.dataset.backOffset || parseHashParam("offset") || "0";
+  if (!articleId) {
+    alert("Chýba ID článku pre pridanie komentára.");
+    return;
+  }
+
+  // Fallback: render the same form as initCommentForm.
+  container.innerHTML = `
+    <form id="comment-form">
+      <div class="field">
+        <label for="c-author">Meno *</label>
+        <input id="c-author" name="author" required>
+      </div>
+      <div class="field">
+        <label for="c-text">Komentár *</label>
+        <textarea id="c-text" name="text" rows="3" required></textarea>
+      </div>
+      <button type="submit" class="btn primary">Odoslať komentár</button>
+    </form>
+  `;
+
+  const form = document.getElementById("comment-form");
+  const user = window.currentUser;
+  if (user && form) form.elements["author"].value = user.name;
+  form?.elements["text"]?.focus();
+
+  form?.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const author = form.elements["author"].value.trim();
+    const text = form.elements["text"].value.trim();
+    if (!author || !text) {
+      alert("Vyplňte meno aj text komentára.");
+      return;
+    }
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Odosielam...";
+    }
+
+    // Local-only comments
+    if (String(articleId).startsWith("local-")) {
+      try {
+        const key = `local_comments_v1_${articleId}`;
+        const current = JSON.parse(localStorage.getItem(key) || "[]") || [];
+        current.unshift({ author, text, dateCreated: new Date().toISOString() });
+        localStorage.setItem(key, JSON.stringify(current));
+        window.location.hash = `#article?id=${articleId}&offset=${backOffset}&cOffset=0`;
+        return;
+      } catch (_) {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Odoslať komentár"; }
+        alert("Nepodarilo sa uložiť lokálny komentár.");
+        return;
+      }
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${BASE_URL}/article/${encodeURIComponent(articleId)}/comment`, true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        window.location.hash = `#article?id=${articleId}&offset=${backOffset}&cOffset=0`;
+      } else {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Odoslať komentár"; }
+        alert("Komentár sa nepodarilo uložiť.");
+      }
+    };
+    xhr.onerror = () => {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Odoslať komentár"; }
+      alert("Chyba siete pri ukladaní komentára.");
+    };
+    xhr.send(JSON.stringify({ author, text }));
+  });
+});

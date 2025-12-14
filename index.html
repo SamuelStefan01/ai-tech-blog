@@ -9,11 +9,8 @@
       content="327532328134-tmtf1h4pcukg5vugn7f0g2bs41o89o5o.apps.googleusercontent.com"
       name="google-signin-client_id"
     />
-    <script
-      async=""
-      defer=""
-      src="https://accounts.google.com/gsi/client"
-    ></script>
+    <!-- Google Sign-In script is loaded dynamically in js/googleSignIn.js
+         to avoid 403 "origin not allowed" errors on 127.0.0.1 during development. -->
     <link href="./css/screenStyle.css" media="screen" rel="stylesheet" />
     <link href="./css/printStyle.css" media="print" rel="stylesheet" />
     <link href="./css/colorPalettes.css" media="screen" rel="stylesheet" />
@@ -296,7 +293,7 @@
         <ul class="articles" aria-label="Zoznam článkov">
           {{#articles}}
           <li class="article-card">
-            <a class="article-link" href="#article?id={{id}}">
+            <a class="article-link" href="#article?id={{id}}&offset={{listOffset}}&cOffset=0">
               <h3>{{title}}</h3>
               <p class="article-meta">Autor: {{author}}</p>
               {{#dateCreated}}
@@ -365,6 +362,19 @@
               {{/comments}}
             </ul>
           {{/comments.length}}
+
+          {{#commentPaging}}
+            <nav class="paging comments-paging">
+              <div class="paging-right">
+                {{#prev}}
+                  <a class="btn btn-prev" href="#article?id={{id}}&offset={{backOffset}}&cOffset={{prevOffset}}">Previous comments</a>
+                {{/prev}}
+                {{#next}}
+                  <a class="btn btn-next" href="#article?id={{id}}&offset={{backOffset}}&cOffset={{nextOffset}}">Next comments</a>
+                {{/next}}
+              </div>
+            </nav>
+          {{/commentPaging}}
           {{^comments.length}}
             <p>Zatiaľ žiadne komentáre.</p>
           {{/comments.length}}

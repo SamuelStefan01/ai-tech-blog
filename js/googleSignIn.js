@@ -1,16 +1,35 @@
-// Handles Google Sign-In and keeps current user in window.currentUser + localStorage
+// Handles Google Sign-In and keeps current user in window.currentUser + localStorage.
+// IMPORTANT:
+// The shared client ID used in school examples typically allows "localhost" but NOT "127.0.0.1".
+// If we load the GSI script on a disallowed origin, it spams errors and slows down the app.
 
-// Disable Google Sign-In on localhost/dev to avoid breaking the app
-const isLocal = location.hostname === "127.0.0.1" || location.hostname === "localhost";
-if (isLocal) {
-  console.warn("Google Sign-In disabled on localhost.");
-} else {
-  // wrap your existing init code in try/catch
-  try {
-    // ... your existing google init code here ...
-  } catch (e) {
-    console.warn("Google Sign-In failed, continuing without it:", e);
-  }
+function shouldLoadGsi() {
+  const h = (location.hostname || "").toLowerCase();
+  if (location.protocol === "file:") return false;
+  // Disallowed in practice for the provided client ID
+  if (h === "127.0.0.1") return false;
+  // Allowed: localhost + typical deployments
+  if (h === "localhost") return true;
+  if (h.endsWith(".netlify.app")) return true;
+  if (h.endsWith(".tuke.sk")) return true;
+  return false;
+}
+
+function loadGsiScript() {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector('script[data-gsi="1"]')) {
+      resolve();
+      return;
+    }
+    const s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true;
+    s.defer = true;
+    s.dataset.gsi = "1";
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load Google Sign-In script"));
+    document.head.appendChild(s);
+  });
 }
 
 // Decode JWT payload using proper UTF-8 handling
@@ -80,6 +99,23 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   updateUserUI();
+
+  // Load Google Sign-In script only on allowed origins.
+  const loginButton = document.querySelector(".g_id_signin");
+  const userInfo = document.getElementById("user-info");
+  if (shouldLoadGsi()) {
+    loadGsiScript().catch((e) => {
+      console.warn("Google Sign-In script failed to load:", e);
+      if (loginButton) loginButton.style.display = "none";
+      if (userInfo) userInfo.textContent = "Google Sign-In nie je dostupné.";
+    });
+  } else {
+    // On 127.0.0.1 the provided client ID rejects the origin → noisy 403 + slow.
+    if ((location.hostname || "") === "127.0.0.1") {
+      if (loginButton) loginButton.style.display = "none";
+      if (userInfo) userInfo.textContent = "Google Sign-In nefunguje na 127.0.0.1. Použi http://localhost:5500.";
+    }
+  }
 
   const logoutButton = document.getElementById("logout-btn");
   if (logoutButton) {
